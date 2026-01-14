@@ -2,19 +2,37 @@ import SwiftUI
 import AppKit
 import CoreImage
 
-/// Helper to ensure app becomes frontmost
+/// Helper to ensure app becomes frontmost and stays interactive
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Set activation policy to regular app (not accessory)
+        NSApp.setActivationPolicy(.regular)
+
         // Make sure we're the active app
         NSApp.activate(ignoringOtherApps: true)
 
         // Make the main window key
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+            if let window = NSApp.windows.first {
+                window.makeKeyAndOrderFront(nil)
+                window.acceptsMouseMovedEvents = true
+            }
         }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Ensure window is key when app becomes active
+        NSApp.windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+        }
         return true
     }
 }
@@ -34,19 +52,17 @@ class CLIRunner {
         }
         print("")
 
-        // Load image
-        guard let nsImage = NSImage(contentsOfFile: imagePath) else {
-            print("ERROR: Could not load image at \(imagePath)")
+        // Load image using ImageConverter
+        let ciImage: CIImage
+        do {
+            ciImage = try ImageConverter.loadImage(from: URL(fileURLWithPath: imagePath))
+        } catch {
+            print("ERROR: \(error.localizedDescription)")
             return
         }
 
-        guard let tiffData = nsImage.tiffRepresentation,
-              let ciImage = CIImage(data: tiffData) else {
-            print("ERROR: Could not convert image to CIImage")
-            return
-        }
-
-        print("Image loaded: \(Int(nsImage.size.width))x\(Int(nsImage.size.height))")
+        let imageSize = ciImage.extent.size
+        print("Image loaded: \(Int(imageSize.width))x\(Int(imageSize.height))")
         print("")
 
         // Load model
@@ -98,6 +114,26 @@ class CLIRunner {
     }
 }
 
+/// Configures window for clean appearance with transparent background
+struct GlassWindowConfig: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                window.titlebarAppearsTransparent = true
+                window.titleVisibility = .hidden
+                window.styleMask.insert(.fullSizeContentView)
+                window.isMovableByWindowBackground = true
+                window.backgroundColor = .clear
+                window.isOpaque = false
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
 @main
 struct MoondreamMacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -125,6 +161,9 @@ struct MoondreamMacApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(service)
+                .background(GlassWindowConfig())
         }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1000, height: 700)
     }
 }

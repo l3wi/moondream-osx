@@ -9,23 +9,41 @@
 /* Begin PBXBuildFile section */
 		13CECA9217212DA0E3E4AD10 /* CaptionLength.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D82071019E213E849FB7F54 /* CaptionLength.swift */; };
 		3EE6B7774E9162B40D785C56 /* MoondreamMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7565ED247D9CE3159F8E3B28 /* MoondreamMacApp.swift */; };
+		3F8D29B1CB4F80F5B1D8D225 /* SkillTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5E69CA500FF0A3E5BB7DAD /* SkillTabBar.swift */; };
 		42C978ECACED658F7495A26A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 953493D9FF97FA18C6CB57F0 /* ContentView.swift */; };
+		5833463BE9E188B0D60AC4FE /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B486E2A80419FEEDFDCAF922 /* EmptyStateView.swift */; };
+		6450A86B6B35F17E32066E18 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E89674AC79FAAA12BFD043A0 /* ResultsView.swift */; };
 		69F6872233D456BBB0713924 /* MoondreamResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99617F3426A0ED03E7A9A01B /* MoondreamResult.swift */; };
 		6D099F908DA9EC35F17458ED /* OverlayModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8023E1672CF029F67F0B8B3D /* OverlayModels.swift */; };
+		86E3F7F787FF46BAEBA7FCFA /* ImagePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A49240CE2889A924EB7B51 /* ImagePanel.swift */; };
+		9481BB32833C660D6F7059FD /* ImageConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B15239900F91452C36C5F10 /* ImageConverter.swift */; };
 		9A84DC94662A377FBA8294BA /* MoondreamService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3A1117804DBF73FE69995A /* MoondreamService.swift */; };
+		9BE5DE3E6434A0BD378463C6 /* ToolbarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477BA8922767B32A7C9FBF7A /* ToolbarPanel.swift */; };
+		A59C2BF0D23D57FDE238A379 /* InputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B91EA41A1DBBE152DAD789C /* InputField.swift */; };
+		C3995A1D3B7B4F59A5B18736 /* ImageLoadedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283971A210E1171265A40F61 /* ImageLoadedView.swift */; };
 		D33626AF69F89E70BE99912E /* Skill.swift in Sources */ = {isa = PBXBuildFile; fileRef = E96CF5DF0415775A35243B97 /* Skill.swift */; };
 		F2C95B2DDEFDFC1E3AFDF514 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7317A6871E66D01F2B73C468 /* Assets.xcassets */; };
+		F3B2317FE1290B205195A9AD /* RunButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33A53569BB17D09255C70EC1 /* RunButton.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0F3A1117804DBF73FE69995A /* MoondreamService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoondreamService.swift; sourceTree = "<group>"; };
+		283971A210E1171265A40F61 /* ImageLoadedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoadedView.swift; sourceTree = "<group>"; };
+		2B15239900F91452C36C5F10 /* ImageConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageConverter.swift; sourceTree = "<group>"; };
+		2B91EA41A1DBBE152DAD789C /* InputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputField.swift; sourceTree = "<group>"; };
+		33A53569BB17D09255C70EC1 /* RunButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunButton.swift; sourceTree = "<group>"; };
+		477BA8922767B32A7C9FBF7A /* ToolbarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolbarPanel.swift; sourceTree = "<group>"; };
 		58D301DDB2E4583D2E57D50E /* MoondreamMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MoondreamMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B5E69CA500FF0A3E5BB7DAD /* SkillTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillTabBar.swift; sourceTree = "<group>"; };
+		71A49240CE2889A924EB7B51 /* ImagePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePanel.swift; sourceTree = "<group>"; };
 		7317A6871E66D01F2B73C468 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Assets.xcassets; path = Sources/MoondreamMac/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		7565ED247D9CE3159F8E3B28 /* MoondreamMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoondreamMacApp.swift; sourceTree = "<group>"; };
 		8023E1672CF029F67F0B8B3D /* OverlayModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayModels.swift; sourceTree = "<group>"; };
 		8D82071019E213E849FB7F54 /* CaptionLength.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionLength.swift; sourceTree = "<group>"; };
 		953493D9FF97FA18C6CB57F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		99617F3426A0ED03E7A9A01B /* MoondreamResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoondreamResult.swift; sourceTree = "<group>"; };
+		B486E2A80419FEEDFDCAF922 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		E89674AC79FAAA12BFD043A0 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
 		E96CF5DF0415775A35243B97 /* Skill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Skill.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -36,8 +54,11 @@
 				7317A6871E66D01F2B73C468 /* Assets.xcassets */,
 				953493D9FF97FA18C6CB57F0 /* ContentView.swift */,
 				7565ED247D9CE3159F8E3B28 /* MoondreamMacApp.swift */,
+				5B68BF0EF51DED5DBED818DC /* Components */,
 				420DF00033AEEF6B43A8FAD8 /* Models */,
 				BBB544E8D42E706765C0579F /* Services */,
+				B4E3D72DDDEF8C56EE2760DA /* Utilities */,
+				F77B7C71058041ACFB9CA530 /* Views */,
 			);
 			path = MoondreamMac;
 			sourceTree = "<group>";
@@ -61,12 +82,31 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		5B68BF0EF51DED5DBED818DC /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				2B91EA41A1DBBE152DAD789C /* InputField.swift */,
+				E89674AC79FAAA12BFD043A0 /* ResultsView.swift */,
+				33A53569BB17D09255C70EC1 /* RunButton.swift */,
+				5B5E69CA500FF0A3E5BB7DAD /* SkillTabBar.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		708CC0B251BB81AF6429AB85 = {
 			isa = PBXGroup;
 			children = (
 				C084191945CE16214D380E28 /* Sources */,
 				2927B0F85CB0D25CAC3F4988 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B4E3D72DDDEF8C56EE2760DA /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				2B15239900F91452C36C5F10 /* ImageConverter.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		BBB544E8D42E706765C0579F /* Services */ = {
@@ -83,6 +123,17 @@
 				06C6ACBD11766C96EDB3F640 /* MoondreamMac */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		F77B7C71058041ACFB9CA530 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B486E2A80419FEEDFDCAF922 /* EmptyStateView.swift */,
+				283971A210E1171265A40F61 /* ImageLoadedView.swift */,
+				71A49240CE2889A924EB7B51 /* ImagePanel.swift */,
+				477BA8922767B32A7C9FBF7A /* ToolbarPanel.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,11 +208,20 @@
 			files = (
 				13CECA9217212DA0E3E4AD10 /* CaptionLength.swift in Sources */,
 				42C978ECACED658F7495A26A /* ContentView.swift in Sources */,
+				5833463BE9E188B0D60AC4FE /* EmptyStateView.swift in Sources */,
+				9481BB32833C660D6F7059FD /* ImageConverter.swift in Sources */,
+				C3995A1D3B7B4F59A5B18736 /* ImageLoadedView.swift in Sources */,
+				86E3F7F787FF46BAEBA7FCFA /* ImagePanel.swift in Sources */,
+				A59C2BF0D23D57FDE238A379 /* InputField.swift in Sources */,
 				3EE6B7774E9162B40D785C56 /* MoondreamMacApp.swift in Sources */,
 				69F6872233D456BBB0713924 /* MoondreamResult.swift in Sources */,
 				9A84DC94662A377FBA8294BA /* MoondreamService.swift in Sources */,
 				6D099F908DA9EC35F17458ED /* OverlayModels.swift in Sources */,
+				6450A86B6B35F17E32066E18 /* ResultsView.swift in Sources */,
+				F3B2317FE1290B205195A9AD /* RunButton.swift in Sources */,
 				D33626AF69F89E70BE99912E /* Skill.swift in Sources */,
+				3F8D29B1CB4F80F5B1D8D225 /* SkillTabBar.swift in Sources */,
+				9BE5DE3E6434A0BD378463C6 /* ToolbarPanel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
