@@ -13,7 +13,7 @@ Both implementations run the int4-quantized Moondream3 model for image captionin
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Python Backend | Working | Produces coherent captions |
-| Swift MoondreamMac | **Working** | GUI app with drag-drop, all skills working |
+| Swift MoondreamMac | **Working** | Liquid Glass UI, drag-drop, all 4 skills working |
 
 ## Architecture
 
@@ -31,20 +31,24 @@ moondream-mlx/
 │       │   ├── Moondream3.swift     # Model implementation + inference
 │       │   └── Moondream3Loader.swift
 │       └── MoondreamMac/            # GUI app
-│           ├── MoondreamMacApp.swift
-│           ├── ContentView.swift    # SwiftUI drag-drop UI
-│           ├── Assets.xcassets/     # App icons
+│           ├── MoondreamMacApp.swift    # App entry, window config
+│           ├── ContentView.swift        # State router (empty/loaded)
+│           ├── Assets.xcassets/         # App icons
+│           ├── Views/                   # Main view components
+│           │   ├── EmptyStateView.swift # Drop zone UI
+│           │   ├── ImageLoadedView.swift# Two-column layout
+│           │   ├── ImagePanel.swift     # Image display + clear button
+│           │   └── ToolbarPanel.swift   # Right sidebar
+│           ├── Components/              # Reusable UI components
+│           │   ├── SkillTabBar.swift    # 4-tab skill picker
+│           │   ├── InputField.swift     # Conditional inputs
+│           │   ├── ResultsView.swift    # Output display
+│           │   └── RunButton.swift      # Action button
 │           ├── Models/
-│           └── Services/
-│               └── MoondreamService.swift
-├── moondream-station/               # Python backend (working)
-│   └── backends/mlx_backend/
-│       ├── backend.py               # API endpoints
-│       └── md3/
-│           ├── model.py             # Moondream model class
-│           ├── text.py              # Text transformer
-│           ├── attention.py         # Attention + KV cache
-│           └── moe.py               # Mixture of Experts
+│           ├── Services/
+│           │   └── MoondreamService.swift
+│           └── Utilities/
+│               └── ImageConverter.swift
 └── CLAUDE.md                        # This file
 ```
 
@@ -257,5 +261,6 @@ query_suffix: [3]
 - [x] Create SwiftUI GUI with drag-drop
 - [x] Add app icons
 - [x] Create Xcode workspace for proper .app bundle
+- [x] Implement Liquid Glass UI with modular components
 - [ ] Fix gatherSort shape issue for MoE (currently disabled)
 - [ ] Performance profiling

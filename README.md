@@ -6,7 +6,6 @@ Vision-language model implementations using Apple's MLX framework for on-device 
 
 | Component | Platform | Status |
 |-----------|----------|--------|
-| **moondream-station** | macOS (Python) | Working |
 | **MoondreamMac** | macOS (Swift) | Working |
 
 ## Model
@@ -20,67 +19,78 @@ Uses [moondream/md3p-int4](https://huggingface.co/moondream/md3p-int4) - an int4
 - **Point**: Locate objects by coordinates
 - **Detect**: Find objects with bounding boxes
 
-## Python Backend (Working)
+## MoondreamMac
 
-```bash
-cd moondream-station
+Native macOS app with Liquid Glass UI design. Supports both GUI and CLI modes.
 
-# Test caption
-python -c "
-from PIL import Image
-from backends.mlx_backend import backend
-import base64, io
+### Features
 
-image = Image.open('path/to/image.png').convert('RGB')
-buf = io.BytesIO()
-image.save(buf, format='PNG')
-b64 = base64.b64encode(buf.getvalue()).decode()
-
-result = backend.caption(f'data:image/png;base64,{b64}')
-print(result)
-"
-```
-
-## Swift MoondreamMac
-
-The Swift implementation provides native macOS support with the same capabilities as the Python backend.
+- **Liquid Glass UI** - Modern semi-transparent design with hidden title bar
+- **Drag & Drop** - Drop images directly onto the app
+- **4 Skills** - Caption, Query, Point, Detect
+- **Real-time Processing** - Progress indicators and streaming results
 
 ### Requirements
 
-- macOS 14+
+- macOS 14+ (macOS 26+ for full Liquid Glass effects)
 - Apple Silicon (M1/M2/M3)
 - Xcode 16+
 
-### Build
+### Build & Run
 
 ```bash
+# Open in Xcode (recommended)
+open MoondreamMac/MoondreamMac.xcworkspace
+
+# Or build from command line
 cd MoondreamMac
 xcodebuild -scheme MoondreamMac -configuration Debug -destination 'platform=macOS' build
 ```
 
 **Note:** `swift run` does not work due to Metal shader bundling issues. Must use Xcode build.
 
-### Run
+### CLI Mode
 
 ```bash
-# Binary location after build
-/Users/<you>/Library/Developer/Xcode/DerivedData/MoondreamMac-*/Build/Products/Debug/MoondreamMac.app/Contents/MacOS/MoondreamMac <image> caption:normal
+# Caption
+./MoondreamMac image.png caption:normal
+
+# Query
+./MoondreamMac image.png query "What is in this image?"
+
+# Point (locate object)
+./MoondreamMac image.png point "the red button"
+
+# Detect (bounding boxes)
+./MoondreamMac image.png detect "people"
 ```
 
 ## Architecture
 
 ```
 moondream-mlx/
-├── MoondreamMac/           # Swift CLI app
+├── MoondreamMac/                    # Swift macOS app
 │   └── Sources/
-│       └── MoondreamMac/
-│           ├── Moondream/  # Model implementation
-│           └── Services/   # Inference service
-├── moondream-station/      # Python backend (working)
-│   └── backends/
-│       └── mlx_backend/
-│           └── md3/        # Model components
-└── CLAUDE.md               # Development notes
+│       ├── MoondreamCore/           # ML model library
+│       │   ├── Moondream3.swift     # Model implementation
+│       │   └── Moondream3Loader.swift
+│       └── MoondreamMac/            # GUI app
+│           ├── MoondreamMacApp.swift
+│           ├── ContentView.swift
+│           ├── Views/               # Main view components
+│           │   ├── EmptyStateView.swift
+│           │   ├── ImageLoadedView.swift
+│           │   ├── ImagePanel.swift
+│           │   └── ToolbarPanel.swift
+│           ├── Components/          # Reusable UI components
+│           │   ├── SkillTabBar.swift
+│           │   ├── InputField.swift
+│           │   ├── ResultsView.swift
+│           │   └── RunButton.swift
+│           ├── Models/
+│           ├── Services/
+│           └── Utilities/
+└── CLAUDE.md                        # Development notes
 ```
 
 ## License
