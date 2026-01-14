@@ -4,6 +4,7 @@ import MLX
 import MLXNN
 import MLXVLM
 import MLXLMCommon
+import MoondreamCore
 import os.log
 
 private let logger = Logger(subsystem: "com.moondream.mac", category: "MoondreamService")
