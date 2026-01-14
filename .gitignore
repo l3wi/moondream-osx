@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+*.dSYM/
+
+# Models (too large for git)
+*.safetensors
+*.bin
+*.gguf
+models/
+
+# Test images (optional - can be large)
+# *.png
+# *.jpg
