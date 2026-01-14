@@ -3,7 +3,7 @@
 ## Project Overview
 
 Cross-platform **Moondream3** vision-language model implementation using Apple's MLX framework:
-- **MoondreamMac** - macOS CLI app (Swift/MLX) - **WIP, not working yet**
+- **MoondreamMac** - macOS CLI app (Swift/MLX) - **Working**
 - **moondream-station** - Python backend server (MLX Python) - **Working**
 
 Both implementations run the int4-quantized Moondream3 model for image captioning, visual Q&A, object detection, and pointing.
@@ -233,6 +233,6 @@ query_suffix: [3]
 - [x] Fix gather indices dtype crash
 - [x] **Fix Swift garbage token output** (RoPE dim, KV cache, generateLogits bugs)
 - [x] Verify Swift produces correct captions
+- [x] Remove debug print statements
 - [ ] Fix gatherSort shape issue for MoE (currently disabled)
 - [ ] Performance profiling
-- [ ] Remove debug print statements

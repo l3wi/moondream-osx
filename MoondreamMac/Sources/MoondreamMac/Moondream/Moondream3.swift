@@ -147,13 +147,8 @@ func applyRotaryEmb(_ x: MLXArray, freqsCis: MLXArray, positions: MLXArray) -> M
     let xqR = xRot[0..., 0..., 0..., ..<dQ]
     let xqI = xRot[0..., 0..., 0..., dQ...]
 
-    // freqs_cos = freqs_cis[positions, :, 0][None, None, :, :]
-    // freqs_sin = freqs_cis[positions, :, 1][None, None, :, :]
-    print("[DEBUG RoPE] positions dtype: \(positions.dtype), shape: \(positions.shape)")
-    print("[DEBUG RoPE] freqsCis dtype: \(freqsCis.dtype), shape: \(freqsCis.shape)")
     // Ensure positions is int32 for gather
     let positionsInt = positions.asType(.int32)
-    print("[DEBUG RoPE] positionsInt dtype: \(positionsInt.dtype)")
     let freqsSlice = freqsCis[positionsInt]  // [seq_len, rot_dim/2, 2]
     let freqsCos = expandedDimensions(expandedDimensions(freqsSlice[0..., 0..., 0], axis: 0), axis: 0)
     let freqsSin = expandedDimensions(expandedDimensions(freqsSlice[0..., 0..., 1], axis: 0), axis: 0)
@@ -298,139 +293,46 @@ private enum Vision {
         /// Create patches from image - Python: create_patches
         /// Input: [B, C, H, W], Output: [B, num_patches, patch_dim]
         func createPatches(_ x: MLXArray) -> MLXArray {
-            print("[DEBUG createPatches] entered")
-            fflush(stdout)
-
             let (B, C, H, W) = (x.dim(0), x.dim(1), x.dim(2), x.dim(3))
-            print("[DEBUG createPatches] dims: B=\(B), C=\(C), H=\(H), W=\(W)")
-            fflush(stdout)
-
             let P = config.encPatchSize
-            print("[DEBUG createPatches] P=\(P)")
-            fflush(stdout)
 
             // x = x.reshape(B, C, H // P, P, W // P, P)
             // x = x.transpose(0, 2, 4, 1, 3, 5)
             // x = x.reshape(B, (H // P) * (W // P), C * P * P)
-            print("[DEBUG createPatches] about to reshape 1...")
-            fflush(stdout)
             var patches = x.reshaped(B, C, H / P, P, W / P, P)
-            print("[DEBUG createPatches] reshape 1 done, shape: \(patches.shape)")
-            fflush(stdout)
-
-            print("[DEBUG createPatches] about to transpose...")
-            fflush(stdout)
             patches = patches.transposed(0, 2, 4, 1, 3, 5)
-            print("[DEBUG createPatches] transpose done, shape: \(patches.shape)")
-            fflush(stdout)
-
-            print("[DEBUG createPatches] about to reshape 2...")
-            fflush(stdout)
             patches = patches.reshaped(B, (H / P) * (W / P), C * P * P)
-            print("[DEBUG createPatches] reshape 2 done, shape: \(patches.shape)")
-            fflush(stdout)
 
             return patches
         }
 
         func callAsFunction(_ x: MLXArray) -> MLXArray {
-            print("[DEBUG Vision] entered callAsFunction")
-            fflush(stdout)
-            // Print shape BEFORE eval to verify shape is available
-            print("[DEBUG Vision] shape before eval: \(x.shape)")
-            fflush(stdout)
-            // Try to eval x to see if error is in eval itself
-            print("[DEBUG Vision] about to eval x...")
-            fflush(stdout)
-            eval(x)
-            print("[DEBUG Vision] x eval complete, shape: \(x.shape), dtype: \(x.dtype)")
-            fflush(stdout)
-
-            print("[DEBUG Vision] checkpoint 1")
-            fflush(stdout)
-
-            // Check patchEmb weight shapes
-            print("[DEBUG Vision] patchEmb.weight shape: \(patchEmb.weight.shape)")
-            fflush(stdout)
-            print("[DEBUG Vision] patchEmb.bias shape: \(patchEmb.bias!.shape)")
-            fflush(stdout)
-
-            print("[DEBUG Vision] checkpoint 2 - about to createPatches")
-            fflush(stdout)
-
             // x is already [B, C, H, W] (NCHW format) from MediaProcessing.asMLXArray
-            // No transpose needed - MediaProcessing outputs NCHW
+            eval(x)
 
             // Create patches and embed
-            print("[DEBUG Vision] creating patches...")
-            fflush(stdout)
             var patches = createPatches(x)
-            print("[DEBUG Vision] createPatches returned")
-            fflush(stdout)
-            print("[DEBUG Vision] about to eval patches...")
-            fflush(stdout)
             eval(patches)
-            print("[DEBUG Vision] patches eval done")
-            fflush(stdout)
-            // SKIP shape printing - it causes crash for unknown reason
-            print("[DEBUG Vision] patches dims: [\(patches.dim(0)), \(patches.dim(1)), \(patches.dim(2))]")
-            fflush(stdout)
-
-            print("[DEBUG Vision] about to call patchEmb...")
-            fflush(stdout)
             patches = patchEmb(patches)
-            print("[DEBUG Vision] patchEmb done, dims: [\(patches.dim(0)), \(patches.dim(1)), \(patches.dim(2))]")
-            fflush(stdout)
-
-            print("[DEBUG Vision] about to add posEmb...")
-            fflush(stdout)
             patches = patches + posEmb
-            print("[DEBUG Vision] posEmb added")
-            fflush(stdout)
 
             // Transformer blocks
-            print("[DEBUG Vision] starting transformer blocks, count: \(blocks.count)")
-            fflush(stdout)
             var h = patches
-            for (i, block) in blocks.enumerated() {
-                print("[DEBUG Vision] block \(i) starting...")
-                fflush(stdout)
+            for block in blocks {
                 h = block(h)
-                print("[DEBUG Vision] block \(i) done")
-                fflush(stdout)
             }
-            print("[DEBUG Vision] all blocks done, applying postLn...")
-            fflush(stdout)
             h = postLn(h)
-            print("[DEBUG Vision] postLn done")
-            fflush(stdout)
 
             // Python concatenates global_features + reconstructed before projection
             // proj_fc1 expects [B, seq, enc_dim * 2] = [B, seq, 2304]
             // For single crop mode, concatenate features with themselves
-            // This mimics what would happen with global + reconstructed being same
-            print("[DEBUG Vision] about to concatenate...")
-            fflush(stdout)
             let concatenatedFeatures = concatenated([h, h], axis: -1)  // [B, seq, 2304]
-            print("[DEBUG Vision] concatenated, dims: [\(concatenatedFeatures.dim(0)), \(concatenatedFeatures.dim(1)), \(concatenatedFeatures.dim(2))]")
-            fflush(stdout)
 
             // Project: 2304 -> 8192 -> 2048
-            print("[DEBUG Vision] about to projFc1...")
-            fflush(stdout)
             let fc1Out = projFc1(concatenatedFeatures)
-            print("[DEBUG Vision] projFc1 done")
-            fflush(stdout)
             let geluOut = geluApproximate(fc1Out)
-            print("[DEBUG Vision] gelu done")
-            fflush(stdout)
             let projected = projFc2(geluOut)
-            print("[DEBUG Vision] projFc2 done, dims: [\(projected.dim(0)), \(projected.dim(1)), \(projected.dim(2))]")
-            fflush(stdout)
 
-            // Return [B, num_patches, proj_out_dim]
-            print("[DEBUG Vision] returning projected")
-            fflush(stdout)
             return projected
         }
     }
@@ -488,17 +390,8 @@ private enum Language {
             cache: (MLXArray, MLXArray)?,
             cachePos: Int
         ) -> (MLXArray, (MLXArray, MLXArray)) {
-            print("[DEBUG Lang.Attn] entered")
-            fflush(stdout)
             let (B, T, C) = (x.dim(0), x.dim(1), x.dim(2))
-            print("[DEBUG Lang.Attn] B=\(B), T=\(T), C=\(C)")
-            fflush(stdout)
-
-            print("[DEBUG Lang.Attn] about to call qkv...")
-            fflush(stdout)
             let qkvOut = qkv(x)  // [B, T, 6144]
-            print("[DEBUG Lang.Attn] qkv done")
-            fflush(stdout)
 
             // Python: q_dim = n_heads * head_dim = 32 * 64 = 2048
             // Python: kv_dim = n_kv_heads * head_dim = 32 * 64 = 2048
@@ -684,37 +577,19 @@ private enum Language {
 
         /// Gather sort for efficient expert routing
         func gatherSort(_ x: MLXArray, indices: MLXArray) -> (MLXArray, MLXArray, MLXArray) {
-            print("[DEBUG gatherSort] entered")
-            fflush(stdout)
             let M = indices.dim(-1)
-            print("[DEBUG gatherSort] M=\(M)")
-            fflush(stdout)
             let indicesFlat = indices.flattened()
-            print("[DEBUG gatherSort] indicesFlat dtype: \(indicesFlat.dtype)")
-            fflush(stdout)
             let order = argSort(indicesFlat)
-            print("[DEBUG gatherSort] order dtype: \(order.dtype)")
-            fflush(stdout)
             let invOrder = argSort(order)
-            print("[DEBUG gatherSort] invOrder dtype: \(invOrder.dtype)")
-            fflush(stdout)
 
             // x.flatten(0, -3)[order // M]
             let xFlat = x.flattened(start: 0, end: x.ndim - 3)
-            print("[DEBUG gatherSort] xFlat done")
-            fflush(stdout)
 
             // CRITICAL: order / M might produce float! Cast to int32
             let orderDivM = (order / M).asType(.int32)
-            print("[DEBUG gatherSort] orderDivM dtype: \(orderDivM.dtype)")
-            fflush(stdout)
 
             let sortedX = take(xFlat, orderDivM, axis: 0)
-            print("[DEBUG gatherSort] sortedX done")
-            fflush(stdout)
             let sortedIdx = take(indicesFlat, order.asType(.int32), axis: 0)
-            print("[DEBUG gatherSort] sortedIdx dtype: \(sortedIdx.dtype)")
-            fflush(stdout)
 
             return (sortedX, sortedIdx, invOrder)
         }
@@ -726,65 +601,35 @@ private enum Language {
         }
 
         func callAsFunction(_ x: MLXArray) -> MLXArray {
-            print("[DEBUG MoE] entered")
-            fflush(stdout)
             let (B, T, C) = (x.dim(0), x.dim(1), x.dim(2))
-            print("[DEBUG MoE] B=\(B), T=\(T), C=\(C)")
-            fflush(stdout)
             let xFlat = x.reshaped(-1, C)
 
             // Router
-            print("[DEBUG MoE] calling router...")
-            fflush(stdout)
             let routerLogits = router(xFlat)
-            print("[DEBUG MoE] router done")
-            fflush(stdout)
 
             // Top-k selection
-            print("[DEBUG MoE] argPartition...")
-            fflush(stdout)
             var topkIdxs = argPartition(-routerLogits, kth: expertsPerToken - 1, axis: -1)
             topkIdxs = topkIdxs[0..., ..<expertsPerToken]
-            print("[DEBUG MoE] topkIdxs dtype: \(topkIdxs.dtype)")
-            fflush(stdout)
             let topkLogits = takeAlong(routerLogits, topkIdxs, axis: -1)
             let topkWeights = softmax(topkLogits, axis: -1)
-            print("[DEBUG MoE] topkWeights done")
-            fflush(stdout)
 
             // Expand input
             var xExpanded = expandedDimensions(xFlat, axes: [-2, -3])
-            print("[DEBUG MoE] xExpanded done")
-            fflush(stdout)
 
             // Sort for efficiency (when many tokens)
             // TEMPORARILY DISABLED - shape issues with gatherSort
             let doSort = false  // topkIdxs.size >= 64
-            print("[DEBUG MoE] doSort: \(doSort), topkIdxs.size: \(topkIdxs.size)")
-            fflush(stdout)
             var idx = topkIdxs
             var invOrder: MLXArray? = nil
 
             if doSort {
-                print("[DEBUG MoE] calling gatherSort...")
-                fflush(stdout)
                 let (sortedX, sortedIdx, inv) = gatherSort(xExpanded, indices: topkIdxs)
-                print("[DEBUG MoE] gatherSort returned, sortedIdx dtype: \(sortedIdx.dtype)")
-                fflush(stdout)
                 xExpanded = sortedX
                 idx = sortedIdx.reshaped(topkIdxs.shape)
                 invOrder = inv
             }
-            print("[DEBUG MoE] idx dtype: \(idx.dtype), ndim: \(idx.ndim), dims: \(idx.ndim > 1 ? "[\(idx.dim(0)), \(idx.dim(1))]" : "[\(idx.dim(0))]")")
-            fflush(stdout)
 
             // FC1 with gather_qmm
-            print("[DEBUG MoE] xExpanded ndim: \(xExpanded.ndim), dims: [\(xExpanded.dim(0)), \(xExpanded.ndim > 1 ? "\(xExpanded.dim(1))" : "N/A")]...")
-            fflush(stdout)
-            print("[DEBUG MoE] fc1Q shape: \(fc1Q.shape)")
-            fflush(stdout)
-            print("[DEBUG MoE] calling gatherQuantizedMatmul for FC1...")
-            fflush(stdout)
             let hFull = gatherQuantizedMatmul(
                 xExpanded, fc1Q,
                 scales: fc1Scales,
@@ -794,8 +639,6 @@ private enum Language {
                 groupSize: groupSize,
                 bits: bits
             )
-            print("[DEBUG MoE] FC1 done")
-            fflush(stdout)
 
             // Gated GELU: gelu(h) * (g + 1)
             let splitOut = hFull.split(parts: 2, axis: -1)
@@ -868,17 +711,9 @@ private enum Language {
             cache: (MLXArray, MLXArray)?,
             cachePos: Int
         ) -> (MLXArray, (MLXArray, MLXArray)) {
-            print("[DEBUG Lang.Block \(layerIdx)] entered, isMoE=\(isMoE)")
-            fflush(stdout)
             let h = ln(x)
-            print("[DEBUG Lang.Block \(layerIdx)] ln done")
-            fflush(stdout)
             let (attnOut, newCache) = attention(h, freqsCis: freqsCis, positions: positions, mask: mask, cache: cache, cachePos: cachePos)
-            print("[DEBUG Lang.Block \(layerIdx)] attention done")
-            fflush(stdout)
             let mlpOut = mlp(h)
-            print("[DEBUG Lang.Block \(layerIdx)] mlp done")
-            fflush(stdout)
             return (x + attnOut + mlpOut, newCache)
         }
     }
@@ -915,13 +750,7 @@ private enum Language {
         }
 
         func embed(_ tokens: MLXArray) -> MLXArray {
-            print("[DEBUG TextModel.embed] tokens dtype: \(tokens.dtype), shape: \(tokens.shape)")
-            print("[DEBUG TextModel.embed] wte.weight dtype: \(wte.weight.dtype), shape: \(wte.weight.shape)")
-            fflush(stdout)
-            let result = wte(tokens)
-            print("[DEBUG TextModel.embed] result dtype: \(result.dtype)")
-            fflush(stdout)
-            return result
+            return wte(tokens)
         }
 
         func callAsFunction(
@@ -931,35 +760,14 @@ private enum Language {
             cache: [(MLXArray, MLXArray)]?,
             cachePos: Int
         ) -> (MLXArray, [(MLXArray, MLXArray)]) {
-            print("[DEBUG TextModel] entered callAsFunction")
-            fflush(stdout)
-            print("[DEBUG TextModel] embeddings dims: [\(embeddings.dim(0)), \(embeddings.dim(1)), \(embeddings.dim(2))]")
-            fflush(stdout)
-            print("[DEBUG TextModel] positions dtype: \(positions.dtype), ndim: \(positions.ndim)")
-            fflush(stdout)
-            print("[DEBUG TextModel] cachePos: \(cachePos)")
-            fflush(stdout)
-
             var x = embeddings
-            print("[DEBUG TextModel] x assigned")
-            fflush(stdout)
-
             var newCaches: [(MLXArray, MLXArray)] = []
-            print("[DEBUG TextModel] newCaches created, about to iterate blocks, count: \(blocks.count)")
-            fflush(stdout)
 
             for (i, block) in blocks.enumerated() {
-                if i == 0 {
-                    print("[DEBUG TextModel] Processing layer 0...")
-                    fflush(stdout)
-                }
                 let blockCache = cache?[i]
                 let (out, newCache) = block(x, freqsCis: freqsCis, positions: positions, mask: mask, cache: blockCache, cachePos: cachePos)
                 x = out
                 newCaches.append(newCache)
-                if i == 0 {
-                    print("[DEBUG TextModel] Layer 0 complete")
-                }
             }
 
             return (x, newCaches)
@@ -1061,26 +869,12 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         cachePos: Int,
         cache: inout [(MLXArray, MLXArray)]
     ) -> MLXArray {
-        print("[DEBUG prefill] entered, cachePos: \(cachePos)")
-        fflush(stdout)
-
         let seqLen = embeddings.dim(1)
-        print("[DEBUG prefill] seqLen: \(seqLen)")
-        fflush(stdout)
-
         let positions = MLXArray((cachePos..<(cachePos + seqLen)).map { Int32($0) })
-        print("[DEBUG prefill] positions dtype: \(positions.dtype)")
-        fflush(stdout)
 
         // Get mask slice for this position range
-        print("[DEBUG prefill] about to slice attnMask...")
-        fflush(stdout)
         let mask = attnMask?[0..., 0..., cachePos..<(cachePos + seqLen), 0...]
-        print("[DEBUG prefill] mask sliced, is nil: \(mask == nil)")
-        fflush(stdout)
 
-        print("[DEBUG prefill] about to call textModel...")
-        fflush(stdout)
         let (hidden, newCaches) = textModel(
             embeddings,
             positions: positions,
@@ -1088,8 +882,6 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
             cache: cache,
             cachePos: cachePos
         )
-        print("[DEBUG prefill] textModel returned")
-        fflush(stdout)
 
         cache = newCaches
         return hidden
@@ -1126,9 +918,6 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         maxTokens: Int = 768,
         temperature: Float = 0.0
     ) -> String {
-        print("[DEBUG] caption() starting...")
-        fflush(stdout)
-
         // Get prompt tokens based on length
         let promptTokens: [Int]
         switch length {
@@ -1139,81 +928,38 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         default:
             promptTokens = [1, 32708, 2, 6382, 3]   // <caption:normal>
         }
-        print("[DEBUG] promptTokens: \(promptTokens)")
-        fflush(stdout)
 
-        // Force evaluation of pixels to isolate any deferred computation errors
-        print("[DEBUG] about to eval pixels...")
-        fflush(stdout)
+        // Evaluate pixels
         eval(pixels)
-        print("[DEBUG] pixels eval complete, shape: \(pixels.shape)")
-        fflush(stdout)
 
         // Encode image
-        print("[DEBUG] calling visionEncoder...")
-        fflush(stdout)
         let imgEmb = visionEncoder(pixels)  // [1, num_patches, proj_dim]
-        print("[DEBUG] visionEncoder returned")
-        fflush(stdout)
-        print("[DEBUG] imgEmb.ndim: \(imgEmb.ndim)")
-        fflush(stdout)
-        print("[DEBUG] imgEmb dims: [\(imgEmb.dim(0)), \(imgEmb.dim(1)), \(imgEmb.dim(2))]")
-        fflush(stdout)
 
         // BOS embedding
-        print("[DEBUG] creating BOS tokens...")
-        fflush(stdout)
         let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)  // [[0]]
-        print("[DEBUG] bosTokens created, dtype: \(bosTokens.dtype), dims: [\(bosTokens.dim(0)), \(bosTokens.dim(1))]")
-        fflush(stdout)
-        print("[DEBUG] calling textModel.embed...")
-        fflush(stdout)
         let bosEmb = textModel.embed(bosTokens)  // [1, 1, dim]
-        print("[DEBUG] bosEmb created, ndim: \(bosEmb.ndim)")
-        fflush(stdout)
-        print("[DEBUG] bosEmb dims: [\(bosEmb.dim(0)), \(bosEmb.dim(1)), \(bosEmb.dim(2))]")
-        fflush(stdout)
 
         // Combine BOS + image embeddings
-        print("[DEBUG] about to concatenate bosEmb and imgEmb...")
-        fflush(stdout)
         let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
-        print("[DEBUG] inputsEmbeds created, dims: [\(inputsEmbeds.dim(0)), \(inputsEmbeds.dim(1)), \(inputsEmbeds.dim(2))]")
-        fflush(stdout)
 
         // Allocate KV cache
-        print("[DEBUG] about to allocateSimpleCache...")
-        fflush(stdout)
         var cache = allocateSimpleCache()
-        print("[DEBUG] cache allocated, layers: \(cache.count)")
-        fflush(stdout)
 
         // Prefill with image
-        print("[DEBUG] about to call prefill with inputsEmbeds...")
-        fflush(stdout)
-        var _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
-        print("[DEBUG] prefill returned")
-        fflush(stdout)
+        _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
         var pos = inputsEmbeds.dim(1)
-        print("[DEBUG] after image prefill, pos: \(pos), cache[0].K shape: \(cache[0].0.shape)")
 
         // Prefill with prompt tokens
         let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
         let promptEmb = textModel.embed(promptArray)
-        print("[DEBUG] promptEmb shape: \(promptEmb.shape)")
 
-        var hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
-        print("[DEBUG] hidden after prompt prefill shape: \(hidden.shape)")
-
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
         var logits = textModel.generateLogits(hidden)
-        print("[DEBUG] logits shape: \(logits.shape)")
 
         pos += promptEmb.dim(1)
-        print("[DEBUG] pos after prompt prefill: \(pos)")
 
         // Sample first token
         var nextToken = sampleToken(logits: logits, temperature: temperature)
-        print("[DEBUG] first token sampled: \(nextToken)")
 
         // Generate tokens
         var tokens: [Int] = []
@@ -1231,16 +977,9 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
             logits = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache)
             nextToken = sampleToken(logits: logits, temperature: temperature)
 
-            // Debug first 5 tokens
-            if generated < 5 {
-                print("[DEBUG] gen \(generated): token=\(tokens.last!), nextToken=\(nextToken), logits shape=\(logits.shape), cache[0].K shape=\(cache[0].0.shape)")
-            }
-
             pos += 1
             generated += 1
         }
-
-        print("[DEBUG] generation complete, tokens: \(tokens.prefix(20))...")
 
         // Decode tokens to string
         return tokenizer.decode(tokens: tokens)
@@ -1501,9 +1240,6 @@ public class Moondream3Processor: UserInputProcessor {
     }
 
     public func prepare(input: UserInput) async throws -> LMInput {
-        print("[PROCESSOR DEBUG] prepare() called"); fflush(stdout)
-        print("[PROCESSOR DEBUG] images count: \(input.images.count)"); fflush(stdout)
-
         let promptText: String
         switch input.prompt {
         case .text(let text):
@@ -1513,28 +1249,16 @@ public class Moondream3Processor: UserInputProcessor {
         case .messages(let messages):
             promptText = messages.compactMap { $0["content"] as? String }.joined(separator: "\n")
         }
-        print("[PROCESSOR DEBUG] promptText: \(promptText)")
 
         var processedImage: LMInput.ProcessedImage?
         if let firstImage = input.images.first {
-            print("[PROCESSOR DEBUG] processing first image...")
-            do {
-                let pixels = try await processImage(firstImage, processing: input.processing)
-                print("[PROCESSOR DEBUG] pixels shape: \(pixels.shape)")
-                processedImage = LMInput.ProcessedImage(pixels: pixels)
-            } catch {
-                print("[PROCESSOR DEBUG] processImage failed: \(error)")
-                throw error
-            }
-        } else {
-            print("[PROCESSOR DEBUG] no images in input!")
+            let pixels = try await processImage(firstImage, processing: input.processing)
+            processedImage = LMInput.ProcessedImage(pixels: pixels)
         }
 
         let tokens = buildTokenSequence(from: promptText)
-        print("[PROCESSOR DEBUG] tokens: \(tokens)")
         let tokenArray = MLXArray(tokens).expandedDimensions(axis: 0)
 
-        print("[PROCESSOR DEBUG] returning LMInput with image: \(processedImage != nil)")
         return LMInput(
             text: LMInput.Text(tokens: tokenArray),
             image: processedImage
@@ -1565,9 +1289,7 @@ public class Moondream3Processor: UserInputProcessor {
     }
 
     private func processImage(_ image: UserInput.Image, processing: UserInput.Processing) async throws -> MLXArray {
-        print("[DEBUG processImage] starting..."); fflush(stdout)
         var ciImage = try image.asCIImage()
-        print("[DEBUG processImage] CIImage extent: \(ciImage.extent)")
         ciImage = MediaProcessing.inSRGBToneCurveSpace(ciImage)
 
         if let resize = processing.resize {
@@ -1575,16 +1297,13 @@ public class Moondream3Processor: UserInputProcessor {
         }
 
         ciImage = MediaProcessing.resampleBicubic(ciImage, to: config.size)
-        print("[DEBUG processImage] after resize: \(ciImage.extent)")
         ciImage = MediaProcessing.normalize(
             ciImage,
             mean: config.imageMeanTuple,
             std: config.imageStdTuple
         )
-        print("[DEBUG processImage] after normalize")
 
         var pixels = MediaProcessing.asMLXArray(ciImage)
-        print("[DEBUG processImage] pixels shape: \(pixels.shape), dtype: \(pixels.dtype)")
         if pixels.ndim == 3 {
             pixels = pixels.expandedDimensions(axis: 0)
         }

@@ -7,7 +7,7 @@ Vision-language model implementations using Apple's MLX framework for on-device 
 | Component | Platform | Status |
 |-----------|----------|--------|
 | **moondream-station** | macOS (Python) | Working |
-| **MoondreamMac** | macOS (Swift) | WIP - Not working |
+| **MoondreamMac** | macOS (Swift) | Working |
 
 ## Model
 
@@ -41,9 +41,9 @@ print(result)
 "
 ```
 
-## Swift MoondreamMac (WIP)
+## Swift MoondreamMac
 
-The Swift implementation builds and runs but produces garbage output. See [CLAUDE.md](CLAUDE.md) for debugging details.
+The Swift implementation provides native macOS support with the same capabilities as the Python backend.
 
 ### Requirements
 
@@ -71,7 +71,7 @@ xcodebuild -scheme MoondreamMac -configuration Debug -destination 'platform=macO
 
 ```
 moondream-mlx/
-├── MoondreamMac/           # Swift CLI app (WIP)
+├── MoondreamMac/           # Swift CLI app
 │   └── Sources/
 │       └── MoondreamMac/
 │           ├── Moondream/  # Model implementation

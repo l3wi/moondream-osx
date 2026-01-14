@@ -15,6 +15,10 @@ xcuserdata/
 *.swift.dependencies
 *.swiftconstvalues
 
+# SwiftPM
+Package.resolved
+.swiftpm/
+
 # Python
 __pycache__/
 *.pyc
@@ -34,6 +38,12 @@ dist/
 # macOS
 .DS_Store
 *.dSYM/
+.AppleDouble
+.LSOverride
+
+# Xcode
+*.xcworkspace
+!*.xcodeproj/project.xcworkspace/
 
 # Models (too large for git)
 *.safetensors
