@@ -65,23 +65,17 @@ final class IntegrationTests: XCTestCase {
         return pixels
     }
 
-    /// Get test image path
-    func getTestImagePath() -> String {
-        // Try bundle resources first
-        if let bundlePath = Bundle.module.path(forResource: "monalisa-on-a-gallery-wall", ofType: "png", inDirectory: "Resources") {
-            return bundlePath
-        }
-        // Fallback to absolute path
-        return "/Users/lewi/Documents/ai/moondream-mlx/monalisa-on-a-gallery-wall.png"
+    /// Get test image path from bundle resources
+    func getTestImagePath() -> String? {
+        Bundle.module.path(forResource: "monalisa-on-a-gallery-wall", ofType: "png", inDirectory: "Resources")
     }
 
     // MARK: - Image Processing Tests
 
     func testImagePreprocessingShape() throws {
         try requireMLX()
-        let imagePath = getTestImagePath()
-        guard FileManager.default.fileExists(atPath: imagePath) else {
-            throw XCTSkip("Test image not found at \(imagePath)")
+        guard let imagePath = getTestImagePath() else {
+            throw XCTSkip("Test image not found in bundle resources")
         }
 
         let pixels = try loadAndProcessImage(from: imagePath)
@@ -96,9 +90,8 @@ final class IntegrationTests: XCTestCase {
 
     func testImagePreprocessingNormalization() throws {
         try requireMLX()
-        let imagePath = getTestImagePath()
-        guard FileManager.default.fileExists(atPath: imagePath) else {
-            throw XCTSkip("Test image not found at \(imagePath)")
+        guard let imagePath = getTestImagePath() else {
+            throw XCTSkip("Test image not found in bundle resources")
         }
 
         let pixels = try loadAndProcessImage(from: imagePath)
@@ -114,9 +107,8 @@ final class IntegrationTests: XCTestCase {
 
     func testImagePreprocessingDtype() throws {
         try requireMLX()
-        let imagePath = getTestImagePath()
-        guard FileManager.default.fileExists(atPath: imagePath) else {
-            throw XCTSkip("Test image not found at \(imagePath)")
+        guard let imagePath = getTestImagePath() else {
+            throw XCTSkip("Test image not found in bundle resources")
         }
 
         let pixels = try loadAndProcessImage(from: imagePath)

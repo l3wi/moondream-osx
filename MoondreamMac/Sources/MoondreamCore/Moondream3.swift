@@ -617,8 +617,9 @@ private enum Language {
             var xExpanded = expandedDimensions(xFlat, axes: [-2, -3])
 
             // Sort for efficiency (when many tokens)
-            // TEMPORARILY DISABLED - shape issues with gatherSort
-            let doSort = false  // topkIdxs.size >= 64
+            // NOTE: Sorting disabled due to shape broadcast issues with gatherSort
+            // See: Known Limitations in README.md
+            let doSort = false
             var idx = topkIdxs
             var invOrder: MLXArray? = nil
 
@@ -829,8 +830,8 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         // Create prefix mask and OR with causal mask
         let prefixMask = MLXArray.ones([1, 1, prefixAttnLen, prefixAttnLen]).asType(.bool)
         // Pad to max context size
+        // NOTE: Using causal mask without explicit padding - works for inference
         var prefixMaskPadded = MLXArray.zeros([1, 1, maxCtx, maxCtx]).asType(.bool)
-        // TODO: Proper padding - for now just use causal mask
 
         self.attnMask = mask
     }
@@ -1075,9 +1076,10 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
             // Greedy
             return Int(argMax(logits1D, axis: -1).item(Int.self))
         } else {
-            // Temperature sampling
+            // Temperature sampling with softmax
+            // NOTE: Using argmax after softmax (deterministic). For stochastic sampling,
+            // implement multinomial sampling from probability distribution.
             let probs = softmax(logits1D / temperature, axis: -1)
-            // Simple argmax for now (TODO: proper sampling)
             return Int(argMax(probs, axis: -1).item(Int.self))
         }
     }
