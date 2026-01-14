@@ -2,6 +2,23 @@ import SwiftUI
 import AppKit
 import CoreImage
 
+/// Helper to ensure app becomes frontmost
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Make sure we're the active app
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Make the main window key
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
+    }
+}
+
 // CLI runner as a separate class to avoid escaping closure issues
 @MainActor
 class CLIRunner {
@@ -83,6 +100,7 @@ class CLIRunner {
 
 @main
 struct MoondreamMacApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var service = MoondreamService.shared
 
     init() {

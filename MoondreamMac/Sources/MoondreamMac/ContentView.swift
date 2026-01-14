@@ -14,6 +14,12 @@ struct ContentView: View {
     @State private var result: String = ""
     @State private var isProcessing: Bool = false
     @State private var isTargeted: Bool = false
+    @FocusState private var focusedField: Field?
+
+    enum Field: Hashable {
+        case query
+        case object
+    }
 
     var body: some View {
         HSplitView {
@@ -106,6 +112,8 @@ struct ContentView: View {
                                 .font(.subheadline)
                             TextField("Enter your question", text: $queryText)
                                 .textFieldStyle(.roundedBorder)
+                                .focused($focusedField, equals: .query)
+                                .onSubmit { runInference() }
                         }
 
                     case .caption:
@@ -126,6 +134,8 @@ struct ContentView: View {
                                 .font(.subheadline)
                             TextField("Enter object name", text: $objectText)
                                 .textFieldStyle(.roundedBorder)
+                                .focused($focusedField, equals: .object)
+                                .onSubmit { runInference() }
                         }
                     }
                 }
@@ -167,6 +177,17 @@ struct ContentView: View {
             // Auto-load model on launch
             if !service.isLoaded && !service.isLoading {
                 try? await service.loadModel()
+            }
+        }
+        .onChange(of: selectedSkill) { _, newSkill in
+            // Set focus to appropriate field when skill changes
+            switch newSkill {
+            case .query:
+                focusedField = .query
+            case .point, .detect:
+                focusedField = .object
+            case .caption:
+                focusedField = nil
             }
         }
     }

@@ -135,18 +135,78 @@ final class MoondreamService: ObservableObject {
         return CaptionResult(caption: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
     }
 
-    /// Point skill - locate objects by coordinates
+    /// Point skill - locate objects by coordinates using direct model inference
     func point(image: CIImage, object: String) async throws -> PointResult {
-        let prompt = buildPointPrompt(object: object)
-        let output = try await runInference(image: image, prompt: prompt)
+        guard let container = modelContainer else {
+            throw MoondreamError.modelNotLoaded
+        }
+
+        logger.info("Starting point: \(object)")
+
+        let output = try await container.perform { context in
+            // Process image
+            let userInput = UserInput(
+                prompt: .text(object),
+                images: [.ciImage(image)]
+            )
+            let input = try await context.processor.prepare(input: userInput)
+
+            guard let pixels = input.image?.pixels else {
+                throw MoondreamError.imageConversionFailed
+            }
+
+            guard let model = context.model as? Moondream3 else {
+                throw MoondreamError.inferenceError("Model is not Moondream3")
+            }
+
+            return model.point(
+                pixels: pixels,
+                object: object,
+                tokenizer: context.tokenizer,
+                maxTokens: 256,
+                temperature: 0.0
+            )
+        }
+
+        logger.info("Point complete: \(output)")
         let points = parsePointResponse(output)
         return PointResult(points: points, rawOutput: output)
     }
 
-    /// Detect skill - detect objects with bounding boxes
+    /// Detect skill - detect objects with bounding boxes using direct model inference
     func detect(image: CIImage, object: String) async throws -> DetectResult {
-        let prompt = buildDetectPrompt(object: object)
-        let output = try await runInference(image: image, prompt: prompt)
+        guard let container = modelContainer else {
+            throw MoondreamError.modelNotLoaded
+        }
+
+        logger.info("Starting detect: \(object)")
+
+        let output = try await container.perform { context in
+            // Process image
+            let userInput = UserInput(
+                prompt: .text(object),
+                images: [.ciImage(image)]
+            )
+            let input = try await context.processor.prepare(input: userInput)
+
+            guard let pixels = input.image?.pixels else {
+                throw MoondreamError.imageConversionFailed
+            }
+
+            guard let model = context.model as? Moondream3 else {
+                throw MoondreamError.inferenceError("Model is not Moondream3")
+            }
+
+            return model.detect(
+                pixels: pixels,
+                object: object,
+                tokenizer: context.tokenizer,
+                maxTokens: 256,
+                temperature: 0.0
+            )
+        }
+
+        logger.info("Detect complete: \(output)")
         let boxes = parseDetectResponse(output)
         return DetectResult(boxes: boxes, rawOutput: output)
     }

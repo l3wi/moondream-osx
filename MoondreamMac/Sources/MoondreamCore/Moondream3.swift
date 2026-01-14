@@ -1048,6 +1048,130 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         return tokenizer.decode(tokens: tokens)
     }
 
+    /// Point to object in image - returns coordinates
+    public func point(
+        pixels: MLXArray,
+        object: String,
+        tokenizer: any Tokenizer,
+        maxTokens: Int = 256,
+        temperature: Float = 0.0
+    ) -> String {
+        // Build prompt tokens: [1, 2581, 2] + object_tokens + [3]
+        let prefix = [1, 2581, 2]  // Point prefix
+        let objectTokens = tokenizer.encode(text: object)
+        let suffix = [3]
+        let promptTokens = prefix + objectTokens + suffix
+
+        // Encode image
+        let imgEmb = visionEncoder(pixels)
+
+        // BOS embedding
+        let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+        let bosEmb = textModel.embed(bosTokens)
+
+        // Combine BOS + image embeddings
+        let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+
+        // Allocate KV cache
+        var cache = allocateSimpleCache()
+
+        // Prefill with image
+        var _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
+        var pos = inputsEmbeds.dim(1)
+
+        // Prefill with prompt tokens
+        let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
+        let promptEmb = textModel.embed(promptArray)
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
+        var logits = textModel.generateLogits(hidden)
+        pos += promptEmb.dim(1)
+
+        // Sample first token
+        var nextToken = sampleToken(logits: logits, temperature: temperature)
+
+        // Generate tokens
+        var tokens: [Int] = []
+        let eosId = 0
+        var generated = 0
+
+        while nextToken != eosId && generated < maxTokens {
+            tokens.append(nextToken)
+
+            let tokenArray = MLXArray([Int32(nextToken)]).expandedDimensions(axis: 0)
+            let nextEmb = textModel.embed(tokenArray)
+
+            logits = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache)
+            nextToken = sampleToken(logits: logits, temperature: temperature)
+
+            pos += 1
+            generated += 1
+        }
+
+        return tokenizer.decode(tokens: tokens)
+    }
+
+    /// Detect objects in image - returns bounding boxes
+    public func detect(
+        pixels: MLXArray,
+        object: String,
+        tokenizer: any Tokenizer,
+        maxTokens: Int = 256,
+        temperature: Float = 0.0
+    ) -> String {
+        // Build prompt tokens: [1, 7235, 476, 2] + object_tokens + [3]
+        let prefix = [1, 7235, 476, 2]  // Detect prefix
+        let objectTokens = tokenizer.encode(text: object)
+        let suffix = [3]
+        let promptTokens = prefix + objectTokens + suffix
+
+        // Encode image
+        let imgEmb = visionEncoder(pixels)
+
+        // BOS embedding
+        let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+        let bosEmb = textModel.embed(bosTokens)
+
+        // Combine BOS + image embeddings
+        let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+
+        // Allocate KV cache
+        var cache = allocateSimpleCache()
+
+        // Prefill with image
+        var _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
+        var pos = inputsEmbeds.dim(1)
+
+        // Prefill with prompt tokens
+        let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
+        let promptEmb = textModel.embed(promptArray)
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
+        var logits = textModel.generateLogits(hidden)
+        pos += promptEmb.dim(1)
+
+        // Sample first token
+        var nextToken = sampleToken(logits: logits, temperature: temperature)
+
+        // Generate tokens
+        var tokens: [Int] = []
+        let eosId = 0
+        var generated = 0
+
+        while nextToken != eosId && generated < maxTokens {
+            tokens.append(nextToken)
+
+            let tokenArray = MLXArray([Int32(nextToken)]).expandedDimensions(axis: 0)
+            let nextEmb = textModel.embed(tokenArray)
+
+            logits = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache)
+            nextToken = sampleToken(logits: logits, temperature: temperature)
+
+            pos += 1
+            generated += 1
+        }
+
+        return tokenizer.decode(tokens: tokens)
+    }
+
     /// Allocate simple (non-quantized) KV cache
     private func allocateSimpleCache() -> [(MLXArray, MLXArray)] {
         let nLayers = config.text.nLayers

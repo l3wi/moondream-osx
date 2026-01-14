@@ -3,7 +3,7 @@
 ## Project Overview
 
 Cross-platform **Moondream3** vision-language model implementation using Apple's MLX framework:
-- **MoondreamMac** - macOS CLI app (Swift/MLX) - **Working**
+- **MoondreamMac** - macOS GUI/CLI app (Swift/MLX) - **Working**
 - **moondream-station** - Python backend server (MLX Python) - **Working**
 
 Both implementations run the int4-quantized Moondream3 model for image captioning, visual Q&A, object detection, and pointing.
@@ -13,19 +13,30 @@ Both implementations run the int4-quantized Moondream3 model for image captionin
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Python Backend | Working | Produces coherent captions |
-| Swift MoondreamMac | **Working** | Produces coherent captions |
+| Swift MoondreamMac | **Working** | GUI app with drag-drop, all skills working |
 
 ## Architecture
 
 ```
 moondream-mlx/
-├── MoondreamMac/                    # macOS Swift CLI app
-│   └── Sources/MoondreamMac/
-│       ├── Moondream/
+├── MoondreamMac/                    # macOS Swift app
+│   ├── Package.swift                # SwiftPM package definition
+│   ├── MoondreamMac.xcworkspace/    # Xcode workspace (GUI app)
+│   ├── MoondreamMacApp.xcodeproj/   # Native app target
+│   ├── App/
+│   │   ├── Info.plist               # App bundle config
+│   │   └── MoondreamMac.entitlements
+│   └── Sources/
+│       ├── MoondreamCore/           # Core ML model library
 │       │   ├── Moondream3.swift     # Model implementation + inference
 │       │   └── Moondream3Loader.swift
-│       └── Services/
-│           └── MoondreamService.swift
+│       └── MoondreamMac/            # GUI app
+│           ├── MoondreamMacApp.swift
+│           ├── ContentView.swift    # SwiftUI drag-drop UI
+│           ├── Assets.xcassets/     # App icons
+│           ├── Models/
+│           └── Services/
+│               └── MoondreamService.swift
 ├── moondream-station/               # Python backend (working)
 │   └── backends/mlx_backend/
 │       ├── backend.py               # API endpoints
@@ -39,17 +50,24 @@ moondream-mlx/
 
 ---
 
-## Building & Testing Swift MoondreamMac
+## Building & Running MoondreamMac
 
-### IMPORTANT: Use Xcode Build, Not `swift run`
+### Option 1: Xcode Workspace (Recommended for GUI)
 
-**`swift run` DOES NOT WORK** - Metal shaders are not bundled correctly with SwiftPM command-line builds. You will get:
+Open the Xcode workspace for full GUI app with app icons:
 
+```bash
+open MoondreamMac/MoondreamMac.xcworkspace
 ```
-Library 'mlx_ext' not found
-```
 
-### Build Command
+In Xcode:
+1. Select **MoondreamMac** scheme
+2. Add package dependencies to target (MoondreamCore, MLX, MLXVLM, etc.)
+3. Press **⌘R** to build and run
+
+### Option 2: Command Line Build (SwiftPM)
+
+**Note:** `swift run` does NOT work - Metal shaders aren't bundled correctly.
 
 ```bash
 cd /Users/lewi/Documents/ai/moondream-mlx/MoondreamMac
@@ -58,29 +76,30 @@ xcodebuild -scheme MoondreamMac -configuration Debug \
   -destination 'platform=macOS' build
 ```
 
-### Run Command
+### CLI Usage
 
-After building with Xcode, run the binary from DerivedData:
-
-```bash
-# Find the built binary
-/Users/lewi/Library/Developer/Xcode/DerivedData/MoondreamMac-cwetnnqvbrdycxdurstgfuteenrk/Build/Products/Debug/MoondreamMac.app/Contents/MacOS/MoondreamMac <image> <skill>
-
-# Example with test image
-/Users/lewi/Library/Developer/Xcode/DerivedData/MoondreamMac-cwetnnqvbrdycxdurstgfuteenrk/Build/Products/Debug/MoondreamMac.app/Contents/MacOS/MoondreamMac \
-  /Users/lewi/Documents/ai/moondream-mlx/monalisa-on-a-gallery-wall.png caption:normal
-```
-
-### Skills
+The app supports both GUI mode (no args) and CLI mode (with args):
 
 ```bash
+# GUI mode - opens window
+./MoondreamMac
+
+# CLI mode - process and exit
+./MoondreamMac <image> <skill> [query]
+
 # Caption (short/normal/long)
-./MoondreamMac <image> caption:normal
-./MoondreamMac <image> caption:short
-./MoondreamMac <image> caption:long
+./MoondreamMac image.png caption:normal
+./MoondreamMac image.png caption:short
+./MoondreamMac image.png caption:long
 
 # Query
-./MoondreamMac <image> query "What painting is shown?"
+./MoondreamMac image.png query "What painting is shown?"
+
+# Point (locate object)
+./MoondreamMac image.png point "cat"
+
+# Detect (bounding boxes)
+./MoondreamMac image.png detect "person"
 ```
 
 ### Test Image
@@ -234,5 +253,9 @@ query_suffix: [3]
 - [x] **Fix Swift garbage token output** (RoPE dim, KV cache, generateLogits bugs)
 - [x] Verify Swift produces correct captions
 - [x] Remove debug print statements
+- [x] Add point() and detect() methods to Swift model
+- [x] Create SwiftUI GUI with drag-drop
+- [x] Add app icons
+- [x] Create Xcode workspace for proper .app bundle
 - [ ] Fix gatherSort shape issue for MoE (currently disabled)
 - [ ] Performance profiling

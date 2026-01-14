@@ -31,7 +31,7 @@ let package = Package(
             ],
             path: "Sources/MoondreamCore"
         ),
-        // CLI executable
+        // GUI executable
         .executableTarget(
             name: "MoondreamMac",
             dependencies: [
@@ -45,7 +45,10 @@ let package = Package(
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
-            path: "Sources/MoondreamMac"
+            path: "Sources/MoondreamMac",
+            resources: [
+                .process("Assets.xcassets")
+            ]
         ),
         // Test target
         .testTarget(
