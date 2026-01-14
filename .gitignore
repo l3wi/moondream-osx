@@ -3,6 +3,17 @@ build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+.build/
+*.pcm
+*.pcm.timestamp
+*.o
+*.d
+*.swiftdoc
+*.swiftmodule
+*.swiftsourceinfo
+*.abi.json
+*.swift.dependencies
+*.swiftconstvalues
 
 # Python
 __pycache__/
