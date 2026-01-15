@@ -3,107 +3,116 @@
 ## Project Overview
 
 Cross-platform **Moondream3** vision-language model implementation using Apple's MLX framework:
-- **MoondreamMac** - macOS GUI/CLI app (Swift/MLX) - **Working**
-- **moondream-station** - Python backend server (MLX Python) - **Working**
+- **MoondreamKit** - Swift Package containing the core ML model (reusable by other developers)
+- **Moondream** - Unified Swift app with macOS + iOS targets (uses MoondreamKit)
 
-Both implementations run the int4-quantized Moondream3 model for image captioning, visual Q&A, object detection, and pointing.
+The int4-quantized Moondream3 model supports image captioning, visual Q&A, object detection, and pointing.
 
 ## Current Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Python Backend | Working | Produces coherent captions |
-| Swift MoondreamMac | **Working** | Liquid Glass UI, drag-drop, all 4 skills working |
+| MoondreamKit Package | **Working** | Standalone Swift Package for model inference |
+| Swift macOS App | **Working** | Liquid Glass UI, drag-drop, all 4 skills |
+| Swift iOS App | **Working** | Camera-first UI, iOS 18+ |
 
 ## Architecture
 
 ```
 moondream-mlx/
-├── MoondreamMac/                    # macOS Swift app
-│   ├── Package.swift                # SwiftPM package definition
-│   ├── MoondreamMac.xcworkspace/    # Xcode workspace (GUI app)
-│   ├── MoondreamMacApp.xcodeproj/   # Native app target
+├── MoondreamKit/                    # Swift Package (reusable)
+│   ├── Package.swift
+│   ├── README.md
+│   ├── Sources/MoondreamKit/
+│   │   ├── Moondream3.swift         # Core model implementation
+│   │   ├── Moondream3Loader.swift   # Model loading from HuggingFace
+│   │   └── Models/
+│   │       ├── Skill.swift          # caption/query/point/detect
+│   │       ├── CaptionLength.swift  # short/normal/long
+│   │       ├── CoordinateTypes.swift # NormalizedPoint, NormalizedBox
+│   │       └── MoondreamResult.swift # Result types
+│   └── Tests/MoondreamKitTests/
+├── Moondream/                       # Unified Swift app (macOS + iOS)
+│   ├── Moondream.xcodeproj/
+│   ├── Moondream.xcworkspace/       # Includes MoondreamKit package
+│   ├── Assets.xcassets/
 │   ├── App/
-│   │   ├── Info.plist               # App bundle config
-│   │   └── MoondreamMac.entitlements
+│   │   ├── Info.plist               # macOS app config
+│   │   └── iOS/Info.plist           # iOS app config
 │   └── Sources/
-│       ├── MoondreamCore/           # Core ML model library
-│       │   ├── Moondream3.swift     # Model implementation + inference
-│       │   └── Moondream3Loader.swift
-│       └── MoondreamMac/            # GUI app
-│           ├── MoondreamMacApp.swift    # App entry, window config
-│           ├── ContentView.swift        # State router (empty/loaded)
-│           ├── Assets.xcassets/         # App icons
-│           ├── Views/                   # Main view components
-│           │   ├── EmptyStateView.swift # Drop zone UI
-│           │   ├── ImageLoadedView.swift# Two-column layout
-│           │   ├── ImagePanel.swift     # Image display + clear button
-│           │   └── ToolbarPanel.swift   # Right sidebar
-│           ├── Components/              # Reusable UI components
-│           │   ├── SkillTabBar.swift    # 4-tab skill picker
-│           │   ├── InputField.swift     # Conditional inputs
-│           │   ├── ResultsView.swift    # Output display
-│           │   └── RunButton.swift      # Action button
-│           ├── Models/
-│           ├── Services/
-│           │   └── MoondreamService.swift
-│           └── Utilities/
-│               └── ImageConverter.swift
+│       ├── Shared/                  # Cross-platform code
+│       │   ├── Models/
+│       │   │   └── OverlayModels.swift  # JSON parsing helpers
+│       │   ├── Services/
+│       │   │   └── MoondreamService.swift
+│       │   └── Utilities/
+│       │       └── ImageConverter.swift
+│       ├── macOS/                   # Mac-specific UI
+│       │   ├── MoondreamApp.swift
+│       │   ├── Views/
+│       │   └── Components/
+│       └── iOS/                     # iOS-specific UI
+│           ├── MoondreamApp.swift
+│           ├── Models/AppState.swift
+│           ├── Services/CameraService.swift
+│           ├── Views/
+│           └── Components/
 └── CLAUDE.md                        # This file
 ```
 
 ---
 
-## Building & Running MoondreamMac
+## Building & Running
 
-### Option 1: Xcode Workspace (Recommended for GUI)
-
-Open the Xcode workspace for full GUI app with app icons:
+### macOS App
 
 ```bash
-open MoondreamMac/MoondreamMac.xcworkspace
+cd /Users/lewi/Documents/ai/moondream-mlx/Moondream
+
+# Build macOS target
+xcodebuild -project Moondream.xcodeproj -scheme Moondream-macOS -configuration Debug build
+
+# Or open in Xcode
+open Moondream.xcworkspace
+# Select "Moondream-macOS" scheme and press ⌘R
 ```
 
-In Xcode:
-1. Select **MoondreamMac** scheme
-2. Add package dependencies to target (MoondreamCore, MLX, MLXVLM, etc.)
-3. Press **⌘R** to build and run
-
-### Option 2: Command Line Build (SwiftPM)
-
-**Note:** `swift run` does NOT work - Metal shaders aren't bundled correctly.
+### iOS App
 
 ```bash
-cd /Users/lewi/Documents/ai/moondream-mlx/MoondreamMac
+cd /Users/lewi/Documents/ai/moondream-mlx/Moondream
 
-xcodebuild -scheme MoondreamMac -configuration Debug \
-  -destination 'platform=macOS' build
+# Build iOS target (simulator)
+xcodebuild -project Moondream.xcodeproj -scheme Moondream-iOS \
+  -destination 'generic/platform=iOS Simulator' -configuration Debug build
+
+# Or open in Xcode
+open Moondream.xcworkspace
+# Select "Moondream-iOS" scheme and press ⌘R
 ```
 
-### CLI Usage
+### CLI Usage (macOS only)
 
-The app supports both GUI mode (no args) and CLI mode (with args):
+The macOS app supports both GUI mode (no args) and CLI mode (with args):
 
 ```bash
 # GUI mode - opens window
-./MoondreamMac
+./Moondream
 
 # CLI mode - process and exit
-./MoondreamMac <image> <skill> [query]
+./Moondream <image> <skill> [query]
 
 # Caption (short/normal/long)
-./MoondreamMac image.png caption:normal
-./MoondreamMac image.png caption:short
-./MoondreamMac image.png caption:long
+./Moondream image.png caption:normal
 
 # Query
-./MoondreamMac image.png query "What painting is shown?"
+./Moondream image.png query "What painting is shown?"
 
 # Point (locate object)
-./MoondreamMac image.png point "cat"
+./Moondream image.png point "cat"
 
 # Detect (bounding boxes)
-./MoondreamMac image.png detect "person"
+./Moondream image.png detect "person"
 ```
 
 ### Test Image
@@ -114,72 +123,33 @@ The app supports both GUI mode (no args) and CLI mode (with args):
 
 ---
 
+## Platform Differences
+
+| Feature | macOS | iOS |
+|---------|-------|-----|
+| UI Design | Liquid Glass 2-panel layout | Camera-first with sheets |
+| Image Input | Drag-drop or file picker | Live camera capture |
+| Overlays | Hover to show labels | Tap to show details |
+| CLI Support | Yes | No |
+| Min Version | macOS 15.0 | iOS 18.0 |
+
+---
+
 ## Known Issues & Quirks
 
-### 1. Garbage Token Output (Swift)
-
-**Status:** ✅ RESOLVED
-
-**Root causes found and fixed:**
-1. **RoPE dimension bug**: Swift used `dim / n_heads = 64` but Python uses `dim / (2 * n_heads) = 32`
-2. **KV cache update**: Swift used concatenation instead of proper in-place update semantics
-3. **generateLogits slicing**: `(-1)...` produced `[B, 1, dim]` instead of `[B, dim]`
-
-All three bugs were fixed and the model now produces coherent captions.
-
-### 2. gatherSort Shape Mismatch (Swift)
+### 1. gatherSort Shape Mismatch (Swift)
 
 **Status:** Disabled as workaround
 
-The `gatherSort` function in MoE has a broadcast shape error:
-```
-(5840) and (730,8) cannot be broadcast
-```
+The `gatherSort` function in MoE has a broadcast shape error.
 
 **Workaround:** `doSort = false` in `QuantizedMoEMLP.callAsFunction()`
 
-### 3. argPartition Returns uint32 (Swift)
-
-MLX Swift's `argPartition` returns `uint32`, but `take()` requires `int32` indices.
-
-**Fix applied:** Cast indices with `.asType(.int32)` before passing to `take()`
-
-### 4. Metal Library Not Found with swift run
+### 2. Metal Library Not Found with swift run
 
 SwiftPM CLI builds don't bundle the Metal shader library correctly.
 
 **Fix:** Always build with `xcodebuild`, not `swift build` / `swift run`
-
----
-
-## Testing Python Backend
-
-```bash
-cd moondream-station
-
-# Clear bytecode cache first
-find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf {} +
-
-# Run test
-python -c "
-from PIL import Image
-from backends.mlx_backend import backend
-import base64, io
-
-backend._model = None
-backend._quantize_mode = True
-
-image = Image.open('/Users/lewi/Documents/ai/moondream-mlx/monalisa-on-a-gallery-wall.png').convert('RGB')
-buf = io.BytesIO()
-image.save(buf, format='PNG')
-b64 = base64.b64encode(buf.getvalue()).decode()
-
-result = backend.caption(f'data:image/png;base64,{b64}')
-print(result)
-"
-```
-
-**Expected:** Coherent description like "The image shows the Mona Lisa painting..."
 
 ---
 
@@ -195,43 +165,12 @@ print(result)
 | Thinking | 4 | Start thinking/reasoning |
 | Coord | 5 | Coordinate token for pointing |
 
-### Prompt Templates
-
-```python
-# Caption prompts (token sequences)
-caption_short:  [1, 32708, 2, 12492, 3]
-caption_normal: [1, 32708, 2, 6382, 3]
-caption_long:   [1, 32708, 2, 4059, 3]
-
-# Query prompt: prefix + question_tokens + suffix
-query_prefix: [1, 15381, 2]
-query_suffix: [3]
-```
-
-### Inference Flow
-
-1. **Encode image** → `img_emb` (shape: `[1, 729, 2048]`)
-2. **Create BOS embedding** → embed token 0
-3. **Concatenate** → `[BOS, img_emb]` (shape: `[1, 730, 2048]`)
-4. **Allocate KV cache** → pre-sized arrays for all 24 layers
-5. **Prefill image** → run forward pass, populate cache
-6. **Prefill prompt tokens** → continue forward pass with cache
-7. **Generate loop:** sample token, embed, decode with cache, repeat until EOS
-
 ### Model Architecture
 
 - **Vision Encoder**: 27 ViT layers, 1152-dim, 16 heads
 - **Text Model**: 24 layers, 2048-dim, 32 heads
 - **MoE**: 64 experts, 8 active per token (layers 4-23)
 - **Layers 0-3**: Standard MLP (not MoE)
-
-### Weight Key Mappings (HF → Swift)
-
-| HuggingFace Key | Swift Model Key |
-|-----------------|-----------------|
-| `text.blocks.N.*` | `text.layers.N.*` |
-| `text.wte.*` | `text.embed_tokens.*` |
-| `vision.blocks.N.*` | `vision.layers.N.*` |
 
 ---
 
@@ -251,16 +190,11 @@ query_suffix: [3]
 
 ## TODO
 
-- [x] Fix Python mx.compile() mask issue
-- [x] Implement Swift KV cache infrastructure
-- [x] Fix gather indices dtype crash
-- [x] **Fix Swift garbage token output** (RoPE dim, KV cache, generateLogits bugs)
-- [x] Verify Swift produces correct captions
-- [x] Remove debug print statements
-- [x] Add point() and detect() methods to Swift model
-- [x] Create SwiftUI GUI with drag-drop
-- [x] Add app icons
-- [x] Create Xcode workspace for proper .app bundle
-- [x] Implement Liquid Glass UI with modular components
-- [ ] Fix gatherSort shape issue for MoE (currently disabled)
+- [x] Fix Swift garbage token output
+- [x] Implement Liquid Glass UI (macOS)
+- [x] Add iOS camera app
+- [x] Merge macOS + iOS into unified project
+- [x] Extract core model into MoondreamKit package
+- [ ] Fix gatherSort shape issue for MoE
+- [ ] Add model download progress to iOS
 - [ ] Performance profiling
