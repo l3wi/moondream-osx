@@ -84,6 +84,98 @@ xcodebuild -scheme Moondream-iOS -destination 'generic/platform=iOS Simulator' b
 ./Moondream image.png detect "people"
 ```
 
+## Integrating MoondreamKit
+
+MoondreamKit is a standalone Swift package you can integrate into your own apps.
+
+### Installation
+
+Add MoondreamKit to your project via Swift Package Manager:
+
+**In Xcode:**
+1. File → Add Package Dependencies
+2. Enter: `https://github.com/l3wi/moondream-osx.git`
+3. Select "MoondreamKit" product
+
+**In Package.swift:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/l3wi/moondream-osx.git", branch: "main")
+],
+targets: [
+    .target(
+        name: "YourApp",
+        dependencies: [
+            .product(name: "MoondreamKit", package: "moondream-osx")
+        ]
+    )
+]
+```
+
+### Quick Start
+
+```swift
+import MoondreamKit
+import CoreImage
+
+// 1. Load the model (downloads ~6GB on first run)
+let container = try await Moondream3Loader.loadContainer(
+    configuration: Moondream3Loader.defaultConfiguration
+) { progress in
+    print("Loading: \(Int(progress.fractionCompleted * 100))%")
+}
+
+// 2. Prepare your image as MLXArray pixels
+let ciImage: CIImage = // your image
+let pixels = try Moondream3.loadImage(ciImage)
+
+// 3. Run inference
+let result = container.perform { context in
+    context.model.caption(
+        pixels: pixels,
+        length: "normal",
+        tokenizer: context.tokenizer,
+        maxTokens: 768,
+        temperature: 0.0
+    )
+}
+print(result) // "A photo of..."
+```
+
+### Available Skills
+
+```swift
+// Caption - Generate descriptions
+context.model.caption(pixels:length:tokenizer:maxTokens:temperature:)
+
+// Query - Ask questions
+context.model.query(pixels:question:tokenizer:maxTokens:temperature:)
+
+// Point - Get object coordinates (returns JSON with x,y normalized 0-1)
+context.model.point(pixels:object:tokenizer:maxTokens:temperature:)
+
+// Detect - Get bounding boxes (returns JSON with xmin,ymin,xmax,ymax)
+context.model.detect(pixels:object:tokenizer:maxTokens:temperature:)
+```
+
+### Model Options
+
+```swift
+// Standard model (6.48 GB) - Best quality
+Moondream3Loader.defaultConfiguration  // "moondream/md3p-int4"
+
+// Compact model (5.43 GB) - Faster, iOS optimized
+Moondream3Loader.compactConfiguration  // "lewi/md3p-int4-smol"
+```
+
+### Important Notes
+
+- **Xcode required**: Must build with Xcode (not `swift build`) due to Metal shader bundling
+- **First launch**: Model downloads from HuggingFace (~6GB) and is cached locally
+- **Memory**: Requires 8GB+ RAM; model auto-unloads after 60s inactivity on macOS
+
+See [MoondreamKit/README.md](MoondreamKit/README.md) for detailed API documentation.
+
 ## Architecture
 
 ```
