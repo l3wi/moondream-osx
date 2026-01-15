@@ -39,14 +39,9 @@ struct ModelDownloadView: View {
                     .foregroundStyle(.primary)
 
                 // Subtitle
-                VStack(spacing: 8) {
-                    Text("No models found")
-                        .font(.title3)
-                        .foregroundStyle(.primary)
-                    Text("Download a model to get started:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Download a model to get started")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                 // Model list with Liquid Glass container
                 GlassEffectContainer {
@@ -160,16 +155,17 @@ struct ModelDownloadRow: View {
                         .font(.title2)
                         .foregroundStyle(.green)
                 } else if !model.isCompatibleWithiOS {
-                    // Incompatible - show disabled state
-                    Image(systemName: "xmark.circle")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
+                    // Incompatible - show nothing
+                    EmptyView()
                 } else {
-                    Button("Download") {
+                    Button {
                         startDownload()
+                    } label: {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.blue)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .buttonStyle(.plain)
                 }
             }
 

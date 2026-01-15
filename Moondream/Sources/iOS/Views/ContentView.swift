@@ -4,11 +4,9 @@ import MoondreamKit
 #if os(iOS)
 /// Root view that manages the app flow:
 /// 1. No models downloaded → ModelDownloadView
-/// 2. Model not loaded → DownloadProgressView (loading)
-/// 3. Model loaded → CameraView
+/// 2. Model downloaded → CameraView (model loads on-demand when running inference)
 struct ContentView: View {
     @Environment(AppState.self) private var appState
-    @StateObject private var moondreamService = MoondreamService.shared
     @State private var hasSkippedDownload = false
 
     var body: some View {
@@ -19,23 +17,14 @@ struct ContentView: View {
                     showSkipButton: true,
                     onSkip: { hasSkippedDownload = true },
                     onModelDownloaded: {
-                        // Model downloaded, will auto-load
-                        Task {
-                            await loadModel()
-                        }
+                        // Model downloaded - camera view will load model on first run
                     }
                 )
             } else if !appState.hasDownloadedModels && hasSkippedDownload {
-                // Skipped but no model - show minimal prompt
-                NoModelView(onDownload: { hasSkippedDownload = false })
-            } else if !appState.isModelLoaded {
-                // Has model but not loaded - show loading progress
-                DownloadProgressView()
-                    .task {
-                        await loadModel()
-                    }
+                // Skipped - show camera but with disabled buttons that redirect to download
+                CameraView(noModelMode: true, onRequestDownload: { hasSkippedDownload = false })
             } else {
-                // Ready - show camera
+                // Has model downloaded - show camera (model loads on-demand when running)
                 CameraView()
             }
         }
@@ -44,21 +33,6 @@ struct ContentView: View {
             // Refresh downloaded models on launch
             appState.refreshDownloadedModels()
         }
-    }
-
-    private func loadModel() async {
-        guard !appState.isModelLoading else { return }
-        appState.isModelLoading = true
-        appState.modelError = nil
-
-        do {
-            try await moondreamService.loadModel(modelId: appState.selectedModelId)
-            appState.isModelLoaded = true
-        } catch {
-            appState.modelError = error.localizedDescription
-        }
-
-        appState.isModelLoading = false
     }
 }
 

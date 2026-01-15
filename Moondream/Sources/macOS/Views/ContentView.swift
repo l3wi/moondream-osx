@@ -36,12 +36,6 @@ struct ContentView: View {
         .frame(minWidth: 800, minHeight: 600)
         .background(.clear)
         .animation(.easeInOut(duration: 0.3), value: droppedImage != nil)
-        .task {
-            // Auto-load model on launch
-            if !service.isLoaded && !service.isLoading {
-                try? await service.loadModel()
-            }
-        }
     }
 }
 

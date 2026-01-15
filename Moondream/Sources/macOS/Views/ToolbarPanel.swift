@@ -14,8 +14,8 @@ struct ToolbarPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Model loading status
-            if !service.isLoaded {
+            // Model loading status (only show when loading or error)
+            if service.isLoading || service.loadError != nil {
                 modelStatusView
                     .padding()
             }
@@ -83,11 +83,6 @@ struct ToolbarPanel: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-            } else {
-                Button("Load Model") {
-                    Task { try? await service.loadModel() }
-                }
-                .buttonStyle(.bordered)
             }
         }
         .padding()

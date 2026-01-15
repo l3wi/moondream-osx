@@ -53,13 +53,6 @@ struct SettingsSheet: View {
                             onDownload: {},
                             onDelete: { deleteModel(model) }
                         )
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                deleteModel(model)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
                     }
 
                     // Available for download
@@ -81,21 +74,7 @@ struct SettingsSheet: View {
                     if downloadedModels.isEmpty {
                         Text("No models downloaded. Download a model to use Moondream.")
                     } else {
-                        Text("Tap to select. Swipe left to delete.")
-                    }
-                }
-
-                // Skill-specific options
-                if appState.selectedSkill == .caption {
-                    Section {
-                        Picker("Length", selection: $state.captionLength) {
-                            ForEach(CaptionLength.allCases) { length in
-                                Text(length.displayName).tag(length)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    } header: {
-                        Text("Caption Length")
+                        Text("Tap to select a model.")
                     }
                 }
 
@@ -193,12 +172,22 @@ struct SettingsSheet: View {
 /// View that displays current memory info with auto-refresh
 struct MemoryInfoView: View {
     @State private var availableMemory: UInt64 = getAvailableMemory()
+    @StateObject private var moondreamService = MoondreamService.shared
 
     // Timer to refresh memory info
     let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Model status
+            HStack {
+                Text("Model")
+                Spacer()
+                Text(moondreamService.isLoaded ? "Loaded" : "Not Loaded")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(moondreamService.isLoaded ? .green : .secondary)
+            }
+
             HStack {
                 Text("Available")
                 Spacer()

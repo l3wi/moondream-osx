@@ -5,6 +5,10 @@ import MoondreamKit
 #if os(iOS)
 /// Main camera view with capture and settings
 struct CameraView: View {
+    // No model mode - shows greyed out buttons that redirect to download
+    var noModelMode: Bool = false
+    var onRequestDownload: (() -> Void)? = nil
+
     @Environment(AppState.self) private var appState
     @StateObject private var cameraService = CameraService()
     @StateObject private var moondreamService = MoondreamService.shared
@@ -64,8 +68,14 @@ struct CameraView: View {
                                 isProcessing: appState.isProcessing,
                                 isFrozen: appState.isFrozen
                             ) {
-                                captureAndProcess()
+                                if noModelMode {
+                                    // Redirect to download screen
+                                    onRequestDownload?()
+                                } else {
+                                    captureAndProcess()
+                                }
                             }
+                            .opacity(noModelMode ? 0.5 : 1.0)
                         }
                     }
 
@@ -150,15 +160,8 @@ struct CameraView: View {
 
         appState.prepareCapture(image: frame)
 
-        if appState.selectedSkill.requiresInput {
-            // Show input modal for skills needing text input
-            appState.showInputModal = true
-        } else {
-            // For caption, run inference immediately
-            Task {
-                await runInference(image: frame)
-            }
-        }
+        // Show input modal for all skills (caption for length picker, others for text input)
+        appState.showInputModal = true
     }
 
     private func runInference(image: CIImage) async {

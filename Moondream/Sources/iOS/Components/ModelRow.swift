@@ -66,12 +66,23 @@ struct ModelRow: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 36, alignment: .trailing)
                 }
-            } else if !isDownloaded {
+            } else if isDownloaded {
+                // Delete button for downloaded models
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                // Download button for undownloaded models
                 if model.isCompatibleWithiOS {
                     Button {
                         onDownload()
                     } label: {
-                        Image(systemName: "arrow.down.circle")
+                        Image(systemName: "arrow.down.circle.fill")
                             .font(.title2)
                             .foregroundStyle(.blue)
                     }

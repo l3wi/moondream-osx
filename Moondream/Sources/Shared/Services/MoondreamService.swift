@@ -76,35 +76,33 @@ final class MoondreamService: ObservableObject {
     /// Currently loaded model ID
     private var loadedModelId: String?
 
-    // MARK: - Memory Management (macOS only)
+    // MARK: - Idle Timer (Memory Management)
 
-    #if os(macOS)
     /// Timer for unloading model after inactivity
     private var unloadTimer: Timer?
 
-    /// Timeout duration before unloading model (60 seconds)
-    private let unloadTimeout: TimeInterval = 60
+    /// Timeout duration before unloading model (30 seconds)
+    private let unloadTimeout: TimeInterval = 30
 
     /// Resets the inactivity timer - call after each inference
     private func resetUnloadTimer() {
         unloadTimer?.invalidate()
         unloadTimer = Timer.scheduledTimer(withTimeInterval: unloadTimeout, repeats: false) { [weak self] _ in
             Task { @MainActor in
-                self?.scheduleUnload()
+                self?.performUnload()
             }
         }
         fileLog("Unload timer reset - model will unload in \(Int(unloadTimeout))s if idle")
     }
 
     /// Called when inactivity timeout expires
-    private func scheduleUnload() {
+    private func performUnload() {
         guard modelContainer != nil else { return }
         fileLog("Inactivity timeout reached - unloading model to free memory")
         unloadModel()
         GPU.clearCache()
         fileLog("Model unloaded and GPU cache cleared")
     }
-    #endif
 
     // MARK: - Model Loading
 
@@ -234,10 +232,10 @@ final class MoondreamService: ObservableObject {
         // Clear GPU cache after inference to free memory
         GPU.clearCache()
         fileLog("GPU cache cleared")
-        #elseif os(macOS)
-        // Reset inactivity timer after successful inference
-        resetUnloadTimer()
         #endif
+
+        // Reset idle timer after successful inference
+        resetUnloadTimer()
 
         return QueryResult(answer: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
     }
@@ -316,9 +314,10 @@ final class MoondreamService: ObservableObject {
         #if os(iOS)
         GPU.clearCache()
         fileLog("GPU cache cleared")
-        #elseif os(macOS)
-        resetUnloadTimer()
         #endif
+
+        // Reset idle timer after successful inference
+        resetUnloadTimer()
 
         return CaptionResult(caption: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
     }
@@ -389,9 +388,10 @@ final class MoondreamService: ObservableObject {
         #if os(iOS)
         GPU.clearCache()
         fileLog("GPU cache cleared")
-        #elseif os(macOS)
-        resetUnloadTimer()
         #endif
+
+        // Reset idle timer after successful inference
+        resetUnloadTimer()
 
         let points = parsePointResponse(output)
         return PointResult(points: points, rawOutput: output)
@@ -463,9 +463,10 @@ final class MoondreamService: ObservableObject {
         #if os(iOS)
         GPU.clearCache()
         fileLog("GPU cache cleared")
-        #elseif os(macOS)
-        resetUnloadTimer()
         #endif
+
+        // Reset idle timer after successful inference
+        resetUnloadTimer()
 
         let boxes = parseDetectResponse(output)
         return DetectResult(boxes: boxes, rawOutput: output)

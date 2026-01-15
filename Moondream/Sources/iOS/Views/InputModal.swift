@@ -38,22 +38,36 @@ struct InputModal: View {
                         .multilineTextAlignment(.center)
                 }
 
-                // Text input - single line that expands
-                TextField(placeholderText, text: $inputText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1...4)
-                    .focused($isInputFocused)
-                    .submitLabel(.done)
-                    .onSubmit {
-                        submit()
+                // Input section - caption length picker or text input
+                if skill == .caption {
+                    // Caption length picker
+                    Picker("Length", selection: Binding(
+                        get: { appState.captionLength },
+                        set: { appState.captionLength = $0 }
+                    )) {
+                        ForEach(CaptionLength.allCases) { length in
+                            Text(length.displayName).tag(length)
+                        }
                     }
-                    .padding(14)
-                    .background {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(.ultraThinMaterial)
-                    }
+                    .pickerStyle(.segmented)
+                } else {
+                    // Text input for other skills
+                    TextField(placeholderText, text: $inputText, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1...4)
+                        .focused($isInputFocused)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            submit()
+                        }
+                        .padding(14)
+                        .background {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(.ultraThinMaterial)
+                        }
+                }
 
                 // Run button
                 Button {
@@ -66,8 +80,8 @@ struct InputModal: View {
                         .padding(.vertical, 14)
                 }
                 .glassEffect(.regular.interactive(), in: .capsule)
-                .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty)
-                .opacity(inputText.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1.0)
+                .disabled(skill != .caption && inputText.trimmingCharacters(in: .whitespaces).isEmpty)
+                .opacity(skill != .caption && inputText.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1.0)
             }
             .padding(20)
             .frame(maxWidth: 320)
@@ -75,14 +89,16 @@ struct InputModal: View {
             .padding(.horizontal, 24)
         }
         .onAppear {
-            // Pre-fill with existing value if available
+            // Pre-fill with existing value if available (not needed for caption)
             if skill == .query {
                 inputText = appState.queryText
-            } else {
+            } else if skill != .caption {
                 inputText = appState.targetObject
             }
-            // Auto-focus immediately to launch keyboard
-            isInputFocused = true
+            // Auto-focus immediately to launch keyboard (except for caption)
+            if skill != .caption {
+                isInputFocused = true
+            }
         }
     }
 
@@ -102,7 +118,7 @@ struct InputModal: View {
         case .query: "What would you like to know about this image?"
         case .point: "Enter the object you want to locate"
         case .detect: "Enter the type of objects to detect"
-        case .caption: ""
+        case .caption: "Choose the level of detail"
         }
     }
 
@@ -118,10 +134,19 @@ struct InputModal: View {
     // MARK: - Actions
 
     private func submit() {
+        isInputFocused = false
+
+        // Caption doesn't need text input
+        if skill == .caption {
+            appState.isProcessing = true
+            appState.showInputModal = false
+            onSubmit()
+            return
+        }
+
+        // For other skills, validate text input
         let trimmed = inputText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-
-        isInputFocused = false
 
         // Write to correct appState property
         if skill == .query {
