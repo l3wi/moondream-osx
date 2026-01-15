@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings cog button
+/// Settings cog button with Liquid Glass effect
 struct SettingsButton: View {
     let action: () -> Void
 
@@ -10,8 +10,8 @@ struct SettingsButton: View {
                 .font(.title2)
                 .foregroundStyle(.white)
                 .padding(14)
-                .background(.ultraThinMaterial, in: Circle())
         }
+        .glassEffect(.regular, in: .circle)
     }
 }
 

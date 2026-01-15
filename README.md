@@ -6,11 +6,15 @@ Vision-language model implementations using Apple's MLX framework for on-device 
 
 | Component | Platform | Status |
 |-----------|----------|--------|
-| **Moondream** | macOS + iOS (Swift) | Working |
+| **MoondreamKit** | Swift Package | Working - Reusable model package |
+| **Moondream** | macOS + iOS | Working - Unified app |
 
-## Model
+## Models
 
-Uses [moondream/md3p-int4](https://huggingface.co/moondream/md3p-int4) - an int4 quantized Moondream3 model (~2GB).
+| Model | ID | Size | Notes |
+|-------|-----|------|-------|
+| Standard | `moondream/md3p-int4` | 6.48 GB | MoE int4, Vision BF16 |
+| Compact | `lewi/md3p-int4-smol` | 5.43 GB | Full int4, iOS optimized |
 
 ## Features
 
@@ -21,7 +25,7 @@ Uses [moondream/md3p-int4](https://huggingface.co/moondream/md3p-int4) - an int4
 
 ## Moondream App
 
-Unified Swift app with both macOS and iOS targets.
+Unified Swift app with both macOS and iOS targets, built on MoondreamKit.
 
 ### macOS Features
 
@@ -29,19 +33,22 @@ Unified Swift app with both macOS and iOS targets.
 - **Drag & Drop** - Drop images directly onto the app
 - **4 Skills** - Caption, Query, Point, Detect
 - **Real-time Processing** - Progress indicators and streaming results
+- **CLI Mode** - Command-line interface for scripting
 
 ### iOS Features
 
+- **iOS 26 Liquid Glass** - Native `glassEffect` and `GlassEffectContainer` APIs
 - **Camera-First UI** - Live camera preview with capture
-- **Real-time Analysis** - Analyze captured images instantly
-- **Settings Sheet** - Configure caption length and other options
+- **Model Selection** - Download and switch between Standard/Compact models
+- **Download Progress** - Visual progress with cancel support
 - **Results Overlay** - Display bounding boxes and point markers
 
 ### Requirements
 
-- macOS 15+ / iOS 18+
-- Apple Silicon (M1/M2/M3/M4) for Mac, A12+ for iOS
-- Xcode 16+
+- macOS 15+ / iOS 26+
+- Apple Silicon (M1/M2/M3/M4) for Mac
+- iPhone 15 Pro or newer for iOS (8GB+ RAM recommended)
+- Xcode 17+
 
 ### Build & Run
 
@@ -53,10 +60,10 @@ open Moondream/Moondream.xcworkspace
 cd Moondream
 
 # Build macOS
-xcodebuild -scheme Moondream-macOS -configuration Debug -destination 'platform=macOS' build
+xcodebuild -scheme Moondream-macOS -configuration Debug build
 
 # Build iOS
-xcodebuild -scheme Moondream-iOS -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -scheme Moondream-iOS -destination 'generic/platform=iOS Simulator' build
 ```
 
 **Note:** `swift run` does not work due to Metal shader bundling issues. Must use Xcode build.
@@ -81,31 +88,31 @@ xcodebuild -scheme Moondream-iOS -destination 'platform=iOS Simulator,name=iPhon
 
 ```
 moondream-mlx/
-├── Moondream/                       # Swift app (macOS + iOS)
+├── MoondreamKit/                    # Swift Package (reusable)
+│   ├── Package.swift
+│   ├── Sources/MoondreamKit/
+│   │   ├── Moondream3.swift         # Standard model
+│   │   ├── Moondream3Quantized.swift # Compact model (in same file)
+│   │   ├── Moondream3Loader.swift   # Model loading from HuggingFace
+│   │   ├── ModelCache.swift         # Cache detection/deletion
+│   │   └── Models/
+│   │       ├── ModelInfo.swift      # Model metadata
+│   │       ├── Skill.swift          # caption/query/point/detect
+│   │       └── ...
+│   └── Tests/
+├── Moondream/                       # Unified Swift app (macOS + iOS)
 │   ├── Moondream.xcworkspace
-│   ├── Moondream.xcodeproj
-│   ├── App/
-│   │   ├── macOS/                   # macOS Info.plist, entitlements
-│   │   └── iOS/                     # iOS Info.plist, entitlements
 │   ├── Sources/
 │   │   ├── Shared/                  # Cross-platform code
-│   │   │   ├── Models/              # Skill, CaptionLength, etc.
-│   │   │   ├── Services/            # MoondreamService
-│   │   │   ├── Utilities/           # ImageConverter
-│   │   │   └── Moondream/           # Core ML model
-│   │   │       ├── Moondream3.swift
-│   │   │       └── Moondream3Loader.swift
+│   │   │   └── Services/MoondreamService.swift
 │   │   ├── macOS/                   # Mac-specific UI
-│   │   │   ├── MoondreamApp.swift
-│   │   │   ├── Views/
-│   │   │   └── Components/
 │   │   └── iOS/                     # iOS-specific UI
-│   │       ├── MoondreamApp.swift
-│   │       ├── Services/            # CameraService
 │   │       ├── Views/
+│   │       │   ├── CameraView.swift
+│   │       │   ├── ModelDownloadView.swift
+│   │       │   └── ...
 │   │       └── Components/
-│   └── Assets/
-└── CLAUDE.md                        # Development notes
+└── docs/tasks/                      # Task documentation
 ```
 
 ## License

@@ -9,6 +9,57 @@ import os.log
 
 private let logger = Logger(subsystem: "com.moondream.mac", category: "MoondreamService")
 
+// Minimal token limits for iOS to conserve memory
+#if os(iOS)
+private let maxGenerationTokens = 128  // Very short responses only
+private let maxDetectionTokens = 32    // Minimal detection
+#else
+private let maxGenerationTokens = 768
+private let maxDetectionTokens = 256
+#endif
+
+// Configure MLX memory management for iOS
+#if os(iOS)
+private func configureMLXMemory() {
+    // Set extremely aggressive cache limit - 20MB as recommended by mlx-swift-examples
+    // This forces MLX to release buffers immediately after use
+    GPU.set(cacheLimit: 20 * 1024 * 1024)  // 20MB cache limit
+
+    // Set memory limit just under iOS threshold to trigger earlier cleanup
+    // 5.5GB to stay safely under the 6GB hard limit
+    GPU.set(memoryLimit: Int(5.5 * 1024 * 1024 * 1024), relaxed: true)
+
+    fileLog("MLX GPU: cache limit=20MB, memory limit=5.5GB (relaxed)")
+}
+#endif
+
+// File-based logging for iOS debugging (since console logs are hard to capture on device)
+private func fileLog(_ message: String) {
+    logger.info("\(message)")
+    #if os(iOS)
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "HH:mm:ss.SSS"
+    let timestamp = dateFormatter.string(from: Date())
+    let logMessage = "[\(timestamp)] [MoondreamService] \(message)\n"
+
+    let fileManager = FileManager.default
+    if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+        let logFile = documentsDir.appendingPathComponent("moondream_inference.log")
+        if let data = logMessage.data(using: .utf8) {
+            if fileManager.fileExists(atPath: logFile.path) {
+                if let handle = try? FileHandle(forWritingTo: logFile) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    handle.closeFile()
+                }
+            } else {
+                try? data.write(to: logFile)
+            }
+        }
+    }
+    #endif
+}
+
 /// Service for loading and running inference with the Moondream model
 @MainActor
 final class MoondreamService: ObservableObject {
@@ -22,32 +73,66 @@ final class MoondreamService: ObservableObject {
 
     var isLoaded: Bool { modelContainer != nil }
 
+    /// Currently loaded model ID
+    private var loadedModelId: String?
+
     // MARK: - Model Loading
 
-    /// Load the Moondream3 model, downloading if necessary
-    func loadModel() async throws {
+    /// Load the Moondream3 model with specific model ID, downloading if necessary
+    /// - Parameter modelId: HuggingFace model ID (e.g., "moondream/md3p-int4")
+    func loadModel(modelId: String? = nil) async throws {
+        let targetModelId = modelId ?? AvailableModels.defaultId
+
+        // If already loaded with same model, skip
+        if let loaded = loadedModelId, loaded == targetModelId, modelContainer != nil {
+            fileLog("Model \(targetModelId) already loaded, skipping")
+            return
+        }
+
         isLoading = true
         loadError = nil
-        logger.info("Starting model load...")
+        fileLog("=== Starting model load: \(targetModelId) ===")
+
+        #if os(iOS)
+        // Configure MLX memory limits before loading model
+        configureMLXMemory()
+        #endif
 
         do {
+            let configuration = Moondream3Loader.configuration(for: targetModelId)
             modelContainer = try await Moondream3Loader.loadContainer(
-                configuration: Moondream3Loader.defaultConfiguration
+                configuration: configuration
             ) { [weak self] progress in
                 Task { @MainActor in
                     self?.loadingProgress = progress.fractionCompleted
                 }
             }
 
-            logger.info("Model loaded successfully!")
+            loadedModelId = targetModelId
+            fileLog("=== Model loaded successfully: \(targetModelId) ===")
+
+            #if os(iOS)
+            // Clear GPU cache after model load to minimize baseline memory
+            GPU.clearCache()
+            fileLog("GPU cache cleared after model load")
+            #endif
+
             loadingProgress = 1.0
             isLoading = false
         } catch {
-            logger.error("Failed to load model: \(error.localizedDescription)")
+            fileLog("ERROR: Failed to load model: \(error.localizedDescription)")
             loadError = error.localizedDescription
             isLoading = false
             throw error
         }
+    }
+
+    /// Unload the current model to free memory
+    func unloadModel() {
+        modelContainer = nil
+        loadedModelId = nil
+        loadingProgress = 0
+        fileLog("Model unloaded")
     }
 
     // MARK: - Inference
@@ -58,34 +143,64 @@ final class MoondreamService: ObservableObject {
             throw MoondreamError.modelNotLoaded
         }
 
-        logger.info("Starting query: \(question)")
+        fileLog("Starting query: \(question)")
+        fileLog("Image size: \(image.extent.size)")
 
         let output = try await container.perform { context in
+            fileLog("Container.perform started")
+
             // Process image - use .text() prompt type to ensure images array is set
+            fileLog("Creating UserInput...")
             let userInput = UserInput(
                 prompt: .text(question),
                 images: [.ciImage(image)]
             )
+
+            fileLog("Preparing input (image processing)...")
             let input = try await context.processor.prepare(input: userInput)
+            fileLog("Input prepared successfully")
 
             guard let pixels = input.image?.pixels else {
+                fileLog("ERROR: Failed to get pixels from processed image")
                 throw MoondreamError.imageConversionFailed
             }
+            fileLog("Pixels shape: \(pixels.shape)")
 
-            guard let model = context.model as? Moondream3 else {
-                throw MoondreamError.inferenceError("Model is not Moondream3")
+            // Support both standard and quantized model types
+            fileLog("Starting model.query()...")
+            let result: String
+            if let model = context.model as? Moondream3 {
+                result = model.query(
+                    pixels: pixels,
+                    question: question,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxGenerationTokens,
+                    temperature: 0.0
+                )
+            } else if let model = context.model as? Moondream3Quantized {
+                result = model.query(
+                    pixels: pixels,
+                    question: question,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxGenerationTokens,
+                    temperature: 0.0
+                )
+            } else {
+                fileLog("ERROR: Unknown model type")
+                throw MoondreamError.inferenceError("Unknown model type")
             }
-
-            return model.query(
-                pixels: pixels,
-                question: question,
-                tokenizer: context.tokenizer,
-                maxTokens: 768,
-                temperature: 0.0
-            )
+            fileLog("model.query() completed successfully")
+            return result
         }
 
-        logger.info("Query complete: \(output)")
+        fileLog("Query complete: \(output)")
+
+        #if os(iOS)
+        // Clear GPU cache after inference to free memory
+        GPU.clearCache()
+        fileLog("GPU cache cleared")
+        #endif
+
         return QueryResult(answer: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
     }
 
@@ -95,26 +210,30 @@ final class MoondreamService: ObservableObject {
             throw MoondreamError.modelNotLoaded
         }
 
-        logger.info("Starting caption with length: \(length.rawValue)")
+        fileLog("Starting caption with length: \(length.rawValue)")
+        fileLog("Image size: \(image.extent.size)")
 
         let output = try await container.perform { context in
+            fileLog("Container.perform started")
+
             // Process image - use .text() prompt type to ensure images array is set
+            fileLog("Creating UserInput...")
             let userInput = UserInput(
                 prompt: .text("<caption:\(length.rawValue)>"),
                 images: [.ciImage(image)]
             )
+
+            fileLog("Preparing input (image processing)...")
             let input = try await context.processor.prepare(input: userInput)
+            fileLog("Input prepared successfully")
 
             guard let pixels = input.image?.pixels else {
+                fileLog("ERROR: Failed to get pixels from processed image")
                 throw MoondreamError.imageConversionFailed
             }
+            fileLog("Pixels shape: \(pixels.shape)")
 
-            // Get model and tokenizer
-            guard let model = context.model as? Moondream3 else {
-                throw MoondreamError.inferenceError("Model is not Moondream3")
-            }
-
-            // Use new caption method that properly handles KV cache
+            // Determine length string
             let lengthStr: String
             switch length {
             case .short: lengthStr = "short"
@@ -122,16 +241,40 @@ final class MoondreamService: ObservableObject {
             case .long: lengthStr = "long"
             }
 
-            return model.caption(
-                pixels: pixels,
-                length: lengthStr,
-                tokenizer: context.tokenizer,
-                maxTokens: 768,
-                temperature: 0.0
-            )
+            // Support both standard and quantized model types
+            fileLog("Starting model.caption() with length: \(lengthStr)")
+            let result: String
+            if let model = context.model as? Moondream3 {
+                result = model.caption(
+                    pixels: pixels,
+                    length: lengthStr,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxGenerationTokens,
+                    temperature: 0.0
+                )
+            } else if let model = context.model as? Moondream3Quantized {
+                result = model.caption(
+                    pixels: pixels,
+                    length: lengthStr,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxGenerationTokens,
+                    temperature: 0.0
+                )
+            } else {
+                fileLog("ERROR: Unknown model type")
+                throw MoondreamError.inferenceError("Unknown model type")
+            }
+            fileLog("model.caption() completed successfully")
+            return result
         }
 
-        logger.info("Caption complete: \(output)")
+        fileLog("Caption complete: \(output)")
+
+        #if os(iOS)
+        GPU.clearCache()
+        fileLog("GPU cache cleared")
+        #endif
+
         return CaptionResult(caption: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
     }
 
@@ -141,34 +284,63 @@ final class MoondreamService: ObservableObject {
             throw MoondreamError.modelNotLoaded
         }
 
-        logger.info("Starting point: \(object)")
+        fileLog("Starting point: \(object)")
+        fileLog("Image size: \(image.extent.size)")
 
         let output = try await container.perform { context in
+            fileLog("Container.perform started")
+
             // Process image
+            fileLog("Creating UserInput...")
             let userInput = UserInput(
                 prompt: .text(object),
                 images: [.ciImage(image)]
             )
+
+            fileLog("Preparing input (image processing)...")
             let input = try await context.processor.prepare(input: userInput)
+            fileLog("Input prepared successfully")
 
             guard let pixels = input.image?.pixels else {
+                fileLog("ERROR: Failed to get pixels from processed image")
                 throw MoondreamError.imageConversionFailed
             }
+            fileLog("Pixels shape: \(pixels.shape)")
 
-            guard let model = context.model as? Moondream3 else {
-                throw MoondreamError.inferenceError("Model is not Moondream3")
+            // Support both standard and quantized model types
+            fileLog("Starting model.point()...")
+            let result: String
+            if let model = context.model as? Moondream3 {
+                result = model.point(
+                    pixels: pixels,
+                    object: object,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxDetectionTokens,
+                    temperature: 0.0
+                )
+            } else if let model = context.model as? Moondream3Quantized {
+                result = model.point(
+                    pixels: pixels,
+                    object: object,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxDetectionTokens,
+                    temperature: 0.0
+                )
+            } else {
+                fileLog("ERROR: Unknown model type")
+                throw MoondreamError.inferenceError("Unknown model type")
             }
-
-            return model.point(
-                pixels: pixels,
-                object: object,
-                tokenizer: context.tokenizer,
-                maxTokens: 256,
-                temperature: 0.0
-            )
+            fileLog("model.point() completed successfully")
+            return result
         }
 
-        logger.info("Point complete: \(output)")
+        fileLog("Point complete: \(output)")
+
+        #if os(iOS)
+        GPU.clearCache()
+        fileLog("GPU cache cleared")
+        #endif
+
         let points = parsePointResponse(output)
         return PointResult(points: points, rawOutput: output)
     }
@@ -179,34 +351,63 @@ final class MoondreamService: ObservableObject {
             throw MoondreamError.modelNotLoaded
         }
 
-        logger.info("Starting detect: \(object)")
+        fileLog("Starting detect: \(object)")
+        fileLog("Image size: \(image.extent.size)")
 
         let output = try await container.perform { context in
+            fileLog("Container.perform started")
+
             // Process image
+            fileLog("Creating UserInput...")
             let userInput = UserInput(
                 prompt: .text(object),
                 images: [.ciImage(image)]
             )
+
+            fileLog("Preparing input (image processing)...")
             let input = try await context.processor.prepare(input: userInput)
+            fileLog("Input prepared successfully")
 
             guard let pixels = input.image?.pixels else {
+                fileLog("ERROR: Failed to get pixels from processed image")
                 throw MoondreamError.imageConversionFailed
             }
+            fileLog("Pixels shape: \(pixels.shape)")
 
-            guard let model = context.model as? Moondream3 else {
-                throw MoondreamError.inferenceError("Model is not Moondream3")
+            // Support both standard and quantized model types
+            fileLog("Starting model.detect()...")
+            let result: String
+            if let model = context.model as? Moondream3 {
+                result = model.detect(
+                    pixels: pixels,
+                    object: object,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxDetectionTokens,
+                    temperature: 0.0
+                )
+            } else if let model = context.model as? Moondream3Quantized {
+                result = model.detect(
+                    pixels: pixels,
+                    object: object,
+                    tokenizer: context.tokenizer,
+                    maxTokens: maxDetectionTokens,
+                    temperature: 0.0
+                )
+            } else {
+                fileLog("ERROR: Unknown model type")
+                throw MoondreamError.inferenceError("Unknown model type")
             }
-
-            return model.detect(
-                pixels: pixels,
-                object: object,
-                tokenizer: context.tokenizer,
-                maxTokens: 256,
-                temperature: 0.0
-            )
+            fileLog("model.detect() completed successfully")
+            return result
         }
 
-        logger.info("Detect complete: \(output)")
+        fileLog("Detect complete: \(output)")
+
+        #if os(iOS)
+        GPU.clearCache()
+        fileLog("GPU cache cleared")
+        #endif
+
         let boxes = parseDetectResponse(output)
         return DetectResult(boxes: boxes, rawOutput: output)
     }

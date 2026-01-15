@@ -14,7 +14,14 @@ The int4-quantized Moondream3 model supports image captioning, visual Q&A, objec
 |-----------|--------|-------|
 | MoondreamKit Package | **Working** | Standalone Swift Package for model inference |
 | Swift macOS App | **Working** | Liquid Glass UI, drag-drop, all 4 skills |
-| Swift iOS App | **Working** | Camera-first UI, iOS 18+ |
+| Swift iOS App | **Working** | iOS 26 Liquid Glass, camera-first UI, model selection |
+
+## Models
+
+| Model | ID | Size | Notes |
+|-------|-----|------|-------|
+| Standard | `moondream/md3p-int4` | 6.48 GB | MoE int4, Vision BF16, best quality |
+| Compact | `lewi/md3p-int4-smol` | 5.43 GB | Full int4, iOS optimized |
 
 ## Architecture
 
@@ -24,9 +31,11 @@ moondream-mlx/
 │   ├── Package.swift
 │   ├── README.md
 │   ├── Sources/MoondreamKit/
-│   │   ├── Moondream3.swift         # Core model implementation
+│   │   ├── Moondream3.swift         # Core model (standard + quantized)
 │   │   ├── Moondream3Loader.swift   # Model loading from HuggingFace
+│   │   ├── ModelCache.swift         # Cache detection/deletion utilities
 │   │   └── Models/
+│   │       ├── ModelInfo.swift      # Model metadata for UI
 │   │       ├── Skill.swift          # caption/query/point/detect
 │   │       ├── CaptionLength.swift  # short/normal/long
 │   │       ├── CoordinateTypes.swift # NormalizedPoint, NormalizedBox
@@ -56,7 +65,16 @@ moondream-mlx/
 │           ├── Models/AppState.swift
 │           ├── Services/CameraService.swift
 │           ├── Views/
+│           │   ├── CameraView.swift      # Main camera with glass controls
+│           │   ├── ModelDownloadView.swift # Model selection screen
+│           │   ├── DownloadProgressView.swift
+│           │   ├── ResultsSheet.swift
+│           │   └── SettingsSheet.swift
 │           └── Components/
+│               ├── SettingsButton.swift  # Glass circle button
+│               ├── CaptureButton.swift
+│               └── ModelRow.swift
+├── docs/tasks/                      # Task documentation
 └── CLAUDE.md                        # This file
 ```
 
@@ -127,11 +145,43 @@ The macOS app supports both GUI mode (no args) and CLI mode (with args):
 
 | Feature | macOS | iOS |
 |---------|-------|-----|
-| UI Design | Liquid Glass 2-panel layout | Camera-first with sheets |
+| UI Design | Liquid Glass 2-panel layout | iOS 26 Liquid Glass camera UI |
+| Glass APIs | `.ultraThinMaterial` | `glassEffect`, `GlassEffectContainer` |
 | Image Input | Drag-drop or file picker | Live camera capture |
 | Overlays | Hover to show labels | Tap to show details |
+| Model Selection | Auto (Standard) | User choice (Standard/Compact) |
 | CLI Support | Yes | No |
-| Min Version | macOS 15.0 | iOS 18.0 |
+| Min Version | macOS 15.0 | iOS 26.0 |
+
+---
+
+## iOS 26 Liquid Glass
+
+The iOS app uses native iOS 26 Liquid Glass APIs:
+
+```swift
+// Glass effect on buttons and cards
+.glassEffect(.regular, in: .circle)
+.glassEffect(.regular, in: .rect(cornerRadius: 12))
+.glassEffect(.clear, in: .capsule)  // Subtle variant
+
+// Container for coordinated glass effects
+GlassEffectContainer {
+    SkillIndicator(...)
+    CaptureButton(...)
+    SettingsButton(...)
+}
+```
+
+### Files Using Glass Effects
+
+| File | Usage |
+|------|-------|
+| `CameraView.swift` | Bottom controls in `GlassEffectContainer`, SkillIndicator, ProcessingOverlay |
+| `SettingsButton.swift` | `.glassEffect(.regular, in: .circle)` |
+| `ModelDownloadView.swift` | Model cards, skip button capsule |
+| `DownloadProgressView.swift` | Progress container |
+| `ResultsSheet.swift` | Detail cards, debug section |
 
 ---
 
@@ -150,6 +200,14 @@ The `gatherSort` function in MoE has a broadcast shape error.
 SwiftPM CLI builds don't bundle the Metal shader library correctly.
 
 **Fix:** Always build with `xcodebuild`, not `swift build` / `swift run`
+
+### 3. Quantization Shape Error for patchEmb
+
+**Status:** Fixed
+
+The vision encoder's `patchEmb` layer had dimension 588 (14×14×3) which isn't divisible by 64.
+
+**Fix:** Changed `patchEmb` from `QuantizedLinear` to `Linear` in `Moondream3.swift`
 
 ---
 
@@ -180,10 +238,10 @@ SwiftPM CLI builds don't bundle the Metal shader library correctly.
 - **mlx-swift-examples** (2.21.0+) - MLXVLM, MLXLMCommon
 - **swift-transformers** (1.0.0+) - Hub, Tokenizers
 
-## Model
+## Model Files
 
-- **ID**: `moondream/md3p-int4`
-- **Size**: ~2GB (int4 quantized)
+- **Standard ID**: `moondream/md3p-int4` (~6.48 GB)
+- **Compact ID**: `lewi/md3p-int4-smol` (~5.43 GB)
 - **Tokenizer**: `moondream/starmie-v1` (vocab_size 51200)
 
 ---
@@ -195,6 +253,8 @@ SwiftPM CLI builds don't bundle the Metal shader library correctly.
 - [x] Add iOS camera app
 - [x] Merge macOS + iOS into unified project
 - [x] Extract core model into MoondreamKit package
+- [x] Add model download/selection screen to iOS
+- [x] Implement iOS 26 Liquid Glass APIs
+- [x] Fix patchEmb quantization shape error
 - [ ] Fix gatherSort shape issue for MoE
-- [ ] Add model download progress to iOS
 - [ ] Performance profiling

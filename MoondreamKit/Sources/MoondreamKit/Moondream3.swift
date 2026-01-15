@@ -12,6 +12,36 @@ import MLXLMCommon
 import MLXNN
 import MLXVLM
 import Tokenizers
+import os.log
+
+// File-based logging for debugging inference (especially on iOS)
+private let md3Logger = Logger(subsystem: "com.moondream.kit", category: "Moondream3")
+
+private func md3Log(_ message: String) {
+    md3Logger.info("\(message)")
+    #if os(iOS)
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "HH:mm:ss.SSS"
+    let timestamp = dateFormatter.string(from: Date())
+    let logMessage = "[\(timestamp)] [Moondream3] \(message)\n"
+
+    let fileManager = FileManager.default
+    if let documentsDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+        let logFile = documentsDir.appendingPathComponent("moondream_inference.log")
+        if let data = logMessage.data(using: .utf8) {
+            if fileManager.fileExists(atPath: logFile.path) {
+                if let handle = try? FileHandle(forWritingTo: logFile) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    handle.closeFile()
+                }
+            } else {
+                try? data.write(to: logFile)
+            }
+        }
+    }
+    #endif
+}
 
 // MARK: - Configuration
 
@@ -1091,6 +1121,8 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         maxTokens: Int = 768,
         temperature: Float = 0.0
     ) -> String {
+        md3Log("caption() started - length: \(length), pixels shape: \(pixels.shape)")
+
         // Get prompt tokens based on length
         let promptTokens: [Int]
         switch length {
@@ -1103,10 +1135,14 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         }
 
         // Evaluate pixels
+        md3Log("Evaluating pixels...")
         eval(pixels)
+        md3Log("Pixels evaluated")
 
         // Encode image
+        md3Log("Running vision encoder...")
         let imgEmb = visionEncoder(pixels)  // [1, num_patches, proj_dim]
+        md3Log("Vision encoder complete - imgEmb shape: \(imgEmb.shape)")
 
         // BOS embedding
         let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)  // [[0]]
@@ -1114,31 +1150,40 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
 
         // Combine BOS + image embeddings
         let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+        md3Log("Combined embeddings shape: \(inputsEmbeds.shape)")
 
         // Allocate KV cache
+        md3Log("Allocating KV cache...")
         var cache = allocateSimpleCache()
+        md3Log("KV cache allocated")
 
         // Prefill with image
+        md3Log("Prefilling with image embeddings...")
         _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
         var pos = inputsEmbeds.dim(1)
+        md3Log("Image prefill complete, pos: \(pos)")
 
         // Prefill with prompt tokens
         let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
         let promptEmb = textModel.embed(promptArray)
 
+        md3Log("Prefilling with prompt tokens...")
         let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
         var logits = textModel.generateLogits(hidden)
 
         pos += promptEmb.dim(1)
+        md3Log("Prompt prefill complete, pos: \(pos)")
 
         // Sample first token
         var nextToken = sampleToken(logits: logits, temperature: temperature)
+        md3Log("First token sampled: \(nextToken)")
 
         // Generate tokens
         var tokens: [Int] = []
         let eosId = 0  // EOS token ID (same as BOS in this model)
         var generated = 0
 
+        md3Log("Starting token generation loop...")
         while nextToken != eosId && generated < maxTokens {
             tokens.append(nextToken)
 
@@ -1152,10 +1197,19 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
 
             pos += 1
             generated += 1
+
+            // Log every 10 tokens to avoid log spam
+            if generated % 10 == 0 {
+                md3Log("Generated \(generated) tokens so far...")
+            }
         }
 
+        md3Log("Generation complete - \(tokens.count) tokens generated")
+
         // Decode tokens to string
-        return tokenizer.decode(tokens: tokens)
+        let result = tokenizer.decode(tokens: tokens)
+        md3Log("Decoded to string: \(result.prefix(100))...")
+        return result
     }
 
     /// Query image with a question - matches Python model.query() flow
@@ -1166,6 +1220,8 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         maxTokens: Int = 768,
         temperature: Float = 0.0
     ) -> String {
+        md3Log("query() started - question: \(question.prefix(50))...")
+
         // Build prompt tokens: [1, 15381, 2] + question_tokens + [3]
         let prefix = [1, 15381, 2]  // Query prefix
         let questionTokens = tokenizer.encode(text: question)
@@ -1173,7 +1229,9 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         let promptTokens = prefix + questionTokens + suffix
 
         // Encode image
+        md3Log("Running vision encoder...")
         let imgEmb = visionEncoder(pixels)
+        md3Log("Vision encoder complete - imgEmb shape: \(imgEmb.shape)")
 
         // BOS embedding
         let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
@@ -1183,27 +1241,35 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
 
         // Allocate KV cache
+        md3Log("Allocating KV cache...")
         var cache = allocateSimpleCache()
+        md3Log("KV cache allocated")
 
         // Prefill with image
+        md3Log("Prefilling with image...")
         var _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
         var pos = inputsEmbeds.dim(1)
+        md3Log("Image prefill complete")
 
         // Prefill with prompt tokens
         let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
         let promptEmb = textModel.embed(promptArray)
+        md3Log("Prefilling with prompt...")
         let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
         var logits = textModel.generateLogits(hidden)
         pos += promptEmb.dim(1)
+        md3Log("Prompt prefill complete")
 
         // Sample first token
         var nextToken = sampleToken(logits: logits, temperature: temperature)
+        md3Log("First token sampled: \(nextToken)")
 
         // Generate tokens
         var tokens: [Int] = []
         let eosId = 0
         var generated = 0
 
+        md3Log("Starting token generation loop...")
         while nextToken != eosId && generated < maxTokens {
             tokens.append(nextToken)
 
@@ -1216,7 +1282,13 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
 
             pos += 1
             generated += 1
+
+            if generated % 10 == 0 {
+                md3Log("Generated \(generated) tokens so far...")
+            }
         }
+
+        md3Log("Generation complete - \(tokens.count) tokens")
 
         return tokenizer.decode(tokens: tokens)
     }
@@ -1369,11 +1441,21 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
     }
 
     /// Allocate simple (non-quantized) KV cache
+    /// Uses smaller cache size on iOS to reduce memory pressure
     private func allocateSimpleCache() -> [(MLXArray, MLXArray)] {
         let nLayers = config.text.nLayers
         let nKvHeads = config.text.nKvHeads
         let headDim = config.text.dim / config.text.nHeads
+
+        // Use minimal cache on iOS to reduce memory usage
+        // 256 tokens for short responses only
+        #if os(iOS)
+        let maxSeqLen = 256
+        #else
         let maxSeqLen = 1024
+        #endif
+
+        md3Log("Allocating KV cache: \(nLayers) layers, \(nKvHeads) heads, \(maxSeqLen) seq, \(headDim) dim")
 
         var cache: [(MLXArray, MLXArray)] = []
 
@@ -1463,8 +1545,15 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
     }
 
     /// Sanitize loaded weights - rename keys to match Swift model structure
+    /// Also detects if model is fully quantized and handles weight key transformations
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
         var sanitized = [String: MLXArray]()
+
+        // Detect if this is a fully quantized model by checking for vision encoder scales
+        let isFullyQuantized = weights.keys.contains { $0.contains("vision.") && $0.contains(".scales") }
+        if isFullyQuantized {
+            md3Log("Detected fully quantized model (md3p-int4-smol)")
+        }
 
         for (key, value) in weights {
             var newKey = key
@@ -1496,6 +1585,917 @@ public class Moondream3: Module, LanguageModel, KVCacheDimensionProvider {
         }
 
         return sanitized
+    }
+}
+
+// MARK: - Quantized Region Model
+
+private enum QuantizedRegion {
+
+    class RegionModel: Module {
+        let config: Moondream3Configuration.RegionConfiguration
+
+        @ModuleInfo(key: "coord_features") var coordFeatures: MLXArray
+        @ModuleInfo(key: "coord_encoder") var coordEncoder: QuantizedLinear
+        @ModuleInfo(key: "coord_decoder") var coordDecoder: QuantizedLinear
+
+        @ModuleInfo(key: "size_features") var sizeFeatures: MLXArray
+        @ModuleInfo(key: "size_encoder") var sizeEncoder: QuantizedLinear
+        @ModuleInfo(key: "size_decoder") var sizeDecoder: QuantizedLinear
+
+        init(_ config: Moondream3Configuration.RegionConfiguration) {
+            self.config = config
+
+            self._coordFeatures.wrappedValue = MLXArray.zeros([1, config.coordFeatDim / 2])
+            self._coordEncoder.wrappedValue = QuantizedLinear(config.coordFeatDim, config.dim, bias: true, groupSize: 64, bits: 4)
+            self._coordDecoder.wrappedValue = QuantizedLinear(config.dim, config.coordOutDim, bias: true, groupSize: 64, bits: 4)
+
+            self._sizeFeatures.wrappedValue = MLXArray.zeros([2, config.sizeFeatDim / 2])
+            self._sizeEncoder.wrappedValue = QuantizedLinear(config.sizeFeatDim, config.dim, bias: true, groupSize: 64, bits: 4)
+            self._sizeDecoder.wrappedValue = QuantizedLinear(config.dim, config.sizeOutDim, bias: true, groupSize: 64, bits: 4)
+        }
+
+        func encodeCoordinate(_ coord: MLXArray) -> MLXArray {
+            let features = Region.fourierFeatures(coord, w: coordFeatures)
+            return coordEncoder(features)
+        }
+
+        func decodeCoordinate(_ hiddenState: MLXArray) -> MLXArray {
+            return coordDecoder(hiddenState)
+        }
+
+        func encodeSize(_ size: MLXArray) -> MLXArray {
+            let features = Region.fourierFeatures(size, w: sizeFeatures)
+            return sizeEncoder(features)
+        }
+
+        func decodeSize(_ hiddenState: MLXArray) -> MLXArray {
+            let logits = sizeDecoder(hiddenState)
+            return logits.reshaped(2, -1)
+        }
+    }
+}
+
+// MARK: - Quantized Model Variant
+
+/// Moondream3 variant with fully quantized vision encoder, text attention, and region model
+/// Use this for lewi/md3p-int4-smol model to fit in iOS memory constraints
+public class Moondream3Quantized: Module, LanguageModel, KVCacheDimensionProvider {
+    @ModuleInfo(key: "vision") private var visionEncoder: QuantizedVision.Encoder
+    @ModuleInfo(key: "text") private var textModel: QuantizedLanguage.TextModel
+    @ModuleInfo(key: "region") private var regionModel: QuantizedRegion.RegionModel
+
+    public let config: Moondream3Configuration
+
+    // Attention mask (precomputed once)
+    private var attnMask: MLXArray?
+
+    public var vocabularySize: Int { config.text.vocabSize }
+    public var kvHeads: [Int] { textModel.kvHeads }
+
+    public init(_ config: Moondream3Configuration) {
+        self.config = config
+        self._visionEncoder.wrappedValue = QuantizedVision.Encoder(config.vision)
+        self._textModel.wrappedValue = QuantizedLanguage.TextModel(config.text)
+        self._regionModel.wrappedValue = QuantizedRegion.RegionModel(config.region)
+
+        // Build attention mask like Python
+        let maxCtx = config.text.maxContext
+        let mask = tril(MLXArray.ones([1, 1, maxCtx, maxCtx]).asType(.bool))
+        self.attnMask = mask
+    }
+
+    // MARK: - KV Cache Allocation
+
+    public func allocateKVCache(batchSize: Int = 1, maxSeqLen: Int = 1024) -> [[(MLXArray, MLXArray)]] {
+        let nLayers = config.text.nLayers
+        let nKvHeads = config.text.nKvHeads
+        let headDim = config.text.dim / config.text.nHeads
+
+        var cache: [[(MLXArray, MLXArray)]] = []
+        for _ in 0..<nLayers {
+            let k = MLXArray.zeros([batchSize, nKvHeads, maxSeqLen, headDim])
+            let v = MLXArray.zeros([batchSize, nKvHeads, maxSeqLen, headDim])
+            cache.append([(k, v)])
+        }
+        return cache
+    }
+
+    // MARK: - Vision Encoding
+
+    public func encodeImage(_ pixels: MLXArray) -> MLXArray {
+        visionEncoder(pixels)
+    }
+
+    // MARK: - Internal Forward Pass with Cache
+
+    private func prefill(
+        embeddings: MLXArray,
+        cachePos: Int,
+        cache: inout [(MLXArray, MLXArray)]
+    ) -> MLXArray {
+        let seqLen = embeddings.dim(1)
+        let positions = MLXArray((cachePos..<(cachePos + seqLen)).map { Int32($0) })
+        let mask = attnMask?[0..., 0..., cachePos..<(cachePos + seqLen), 0...]
+
+        let (hidden, newCaches) = textModel(
+            embeddings,
+            positions: positions,
+            mask: mask,
+            cache: cache,
+            cachePos: cachePos
+        )
+
+        cache = newCaches
+        return hidden
+    }
+
+    private func decodeOne(
+        embedding: MLXArray,
+        cachePos: Int,
+        cache: inout [(MLXArray, MLXArray)]
+    ) -> (logits: MLXArray, hidden: MLXArray) {
+        let positions = MLXArray([Int32(cachePos)])
+
+        let (hidden, newCaches) = textModel(
+            embedding,
+            positions: positions,
+            mask: nil,
+            cache: cache,
+            cachePos: cachePos
+        )
+
+        cache = newCaches
+        return (textModel.generateLogits(hidden), hidden)
+    }
+
+    // MARK: - Generation Methods (delegate to shared implementation)
+
+    public func caption(
+        pixels: MLXArray,
+        length: String = "normal",
+        tokenizer: any Tokenizer,
+        maxTokens: Int = 768,
+        temperature: Float = 0.0
+    ) -> String {
+        md3Log("caption() [quantized] started - length: \(length)")
+        eval(pixels)
+
+        let promptTokens: [Int]
+        switch length {
+        case "short": promptTokens = [1, 32708, 2, 12492, 3]
+        case "long": promptTokens = [1, 32708, 2, 4059, 3]
+        default: promptTokens = [1, 32708, 2, 6382, 3]
+        }
+
+        let imgEmb = visionEncoder(pixels)
+        let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+        let bosEmb = textModel.embed(bosTokens)
+        let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+
+        var cache = allocateSimpleCache()
+        _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
+        var pos = inputsEmbeds.dim(1)
+
+        let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
+        let promptEmb = textModel.embed(promptArray)
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
+        var logits = textModel.generateLogits(hidden)
+        pos += promptEmb.dim(1)
+
+        var nextToken = sampleToken(logits: logits, temperature: temperature)
+        var tokens: [Int] = []
+        let eosId = 0
+        var generated = 0
+
+        while nextToken != eosId && generated < maxTokens {
+            tokens.append(nextToken)
+            let tokenArray = MLXArray([Int32(nextToken)]).expandedDimensions(axis: 0)
+            let nextEmb = textModel.embed(tokenArray)
+            logits = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache).logits
+            nextToken = sampleToken(logits: logits, temperature: temperature)
+            pos += 1
+            generated += 1
+        }
+
+        return tokenizer.decode(tokens: tokens)
+    }
+
+    public func query(
+        pixels: MLXArray,
+        question: String,
+        tokenizer: any Tokenizer,
+        maxTokens: Int = 768,
+        temperature: Float = 0.0
+    ) -> String {
+        md3Log("query() [quantized] started - question: \(question.prefix(50))...")
+
+        let prefix = [1, 15381, 2]
+        let questionTokens = tokenizer.encode(text: question)
+        let suffix = [3]
+        let promptTokens = prefix + questionTokens + suffix
+
+        let imgEmb = visionEncoder(pixels)
+        let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+        let bosEmb = textModel.embed(bosTokens)
+        let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+
+        var cache = allocateSimpleCache()
+        _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
+        var pos = inputsEmbeds.dim(1)
+
+        let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
+        let promptEmb = textModel.embed(promptArray)
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
+        var logits = textModel.generateLogits(hidden)
+        pos += promptEmb.dim(1)
+
+        var nextToken = sampleToken(logits: logits, temperature: temperature)
+        var tokens: [Int] = []
+        let eosId = 0
+        var generated = 0
+
+        while nextToken != eosId && generated < maxTokens {
+            tokens.append(nextToken)
+            let tokenArray = MLXArray([Int32(nextToken)]).expandedDimensions(axis: 0)
+            let nextEmb = textModel.embed(tokenArray)
+            logits = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache).logits
+            nextToken = sampleToken(logits: logits, temperature: temperature)
+            pos += 1
+            generated += 1
+        }
+
+        return tokenizer.decode(tokens: tokens)
+    }
+
+    public func point(
+        pixels: MLXArray,
+        object: String,
+        tokenizer: any Tokenizer,
+        maxTokens: Int = 256,
+        temperature: Float = 0.0
+    ) -> String {
+        let prefix = [1, 2581, 2]
+        let objectTokens = tokenizer.encode(text: " " + object)
+        let suffix = [3]
+        let promptTokens = prefix + objectTokens + suffix
+
+        let imgEmb = visionEncoder(pixels)
+        let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+        let bosEmb = textModel.embed(bosTokens)
+        let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+
+        var cache = allocateSimpleCache()
+        _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
+        var pos = inputsEmbeds.dim(1)
+
+        let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
+        let promptEmb = textModel.embed(promptArray)
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
+        let logits = textModel.generateLogits(hidden)
+        pos += promptEmb.dim(1)
+
+        let firstToken = sampleToken(logits: logits, temperature: 0)
+        let coordId = 5
+
+        if firstToken != coordId {
+            return ""
+        }
+
+        let lastHidden = hidden[0..., (-1)..., 0...].squeezed(axis: 1)
+        let points = generatePoints(
+            hidden: lastHidden.expandedDimensions(axis: 0).expandedDimensions(axis: 1),
+            firstToken: coordId,
+            startPos: pos,
+            cache: &cache,
+            includeSize: false,
+            maxObjects: 50
+        )
+
+        if points.isEmpty { return "" }
+
+        return points.map { point in
+            String(format: "(%.4f, %.4f)", point["x"]!, point["y"]!)
+        }.joined(separator: ", ")
+    }
+
+    public func detect(
+        pixels: MLXArray,
+        object: String,
+        tokenizer: any Tokenizer,
+        maxTokens: Int = 256,
+        temperature: Float = 0.0
+    ) -> String {
+        let prefix = [1, 7235, 476, 2]
+        let objectTokens = tokenizer.encode(text: " " + object)
+        let suffix = [3]
+        let promptTokens = prefix + objectTokens + suffix
+
+        let imgEmb = visionEncoder(pixels)
+        let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+        let bosEmb = textModel.embed(bosTokens)
+        let inputsEmbeds = concatenated([bosEmb, imgEmb], axis: 1)
+
+        var cache = allocateSimpleCache()
+        _ = prefill(embeddings: inputsEmbeds, cachePos: 0, cache: &cache)
+        var pos = inputsEmbeds.dim(1)
+
+        let promptArray = MLXArray(promptTokens.map { Int32($0) }).expandedDimensions(axis: 0)
+        let promptEmb = textModel.embed(promptArray)
+        let hidden = prefill(embeddings: promptEmb, cachePos: pos, cache: &cache)
+        let logits = textModel.generateLogits(hidden)
+        pos += promptEmb.dim(1)
+
+        let firstToken = sampleToken(logits: logits, temperature: 0)
+        let coordId = 5
+
+        if firstToken != coordId {
+            return ""
+        }
+
+        let lastHidden = hidden[0..., (-1)..., 0...].squeezed(axis: 1)
+        let boxes = generatePoints(
+            hidden: lastHidden.expandedDimensions(axis: 0).expandedDimensions(axis: 1),
+            firstToken: coordId,
+            startPos: pos,
+            cache: &cache,
+            includeSize: true,
+            maxObjects: 150
+        )
+
+        if boxes.isEmpty { return "" }
+
+        return boxes.map { box in
+            String(format: "[%.4f, %.4f, %.4f, %.4f]",
+                   box["x_min"]!, box["y_min"]!, box["x_max"]!, box["y_max"]!)
+        }.joined(separator: ", ")
+    }
+
+    private func generatePoints(
+        hidden: MLXArray,
+        firstToken: Int,
+        startPos: Int,
+        cache: inout [(MLXArray, MLXArray)],
+        includeSize: Bool,
+        maxObjects: Int
+    ) -> [[String: Float]] {
+        var out: [[String: Float]] = []
+        let eosId = 0
+        let coordId = 5
+        var pos = startPos
+        var currentHidden = hidden
+        var currentToken = firstToken
+
+        while currentToken != eosId && out.count < maxObjects {
+            let xLogits = regionModel.decodeCoordinate(currentHidden)
+            let xIdx = Int(argMax(xLogits.reshaped(-1), axis: -1).item(Int.self))
+            let xCenter = Float(xIdx) / Float(xLogits.dim(-1))
+            let xCoord = MLXArray([xCenter]).expandedDimensions(axis: 0)
+            var nextEmb = regionModel.encodeCoordinate(xCoord).reshaped(1, 1, -1)
+
+            let (_, yHidden) = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache)
+            pos += 1
+
+            let yLogits = regionModel.decodeCoordinate(yHidden)
+            let yIdx = Int(argMax(yLogits.reshaped(-1), axis: -1).item(Int.self))
+            let yCenter = Float(yIdx) / Float(yLogits.dim(-1))
+            let yCoord = MLXArray([yCenter]).expandedDimensions(axis: 0)
+            nextEmb = regionModel.encodeCoordinate(yCoord).reshaped(1, 1, -1)
+
+            if includeSize {
+                let (_, sizeHidden) = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache)
+                pos += 1
+
+                let sizeLogits = regionModel.decodeSize(sizeHidden[0..., (-1)..., 0...].squeezed(axis: 1))
+                let wBin = Int(argMax(sizeLogits[0], axis: -1).item(Int.self))
+                let hBin = Int(argMax(sizeLogits[1], axis: -1).item(Int.self))
+                let w = Float(Region.binToSize(MLXArray([wBin])).item(Float.self))
+                let h = Float(Region.binToSize(MLXArray([hBin])).item(Float.self))
+
+                let sizeArr = MLXArray([w, h]).expandedDimensions(axis: 0)
+                nextEmb = regionModel.encodeSize(sizeArr).reshaped(1, 1, -1)
+
+                let xMin = xCenter - w / 2
+                let yMin = yCenter - h / 2
+                let xMax = xCenter + w / 2
+                let yMax = yCenter + h / 2
+                out.append(["x_min": xMin, "y_min": yMin, "x_max": xMax, "y_max": yMax])
+            } else {
+                out.append(["x": xCenter, "y": yCenter])
+            }
+
+            let (nextLogits, nextHidden) = decodeOne(embedding: nextEmb, cachePos: pos, cache: &cache)
+            pos += 1
+            currentHidden = nextHidden
+
+            let coordLogit = nextLogits[0..., coordId].item(Float.self)
+            let eosLogit = nextLogits[0..., eosId].item(Float.self)
+            currentToken = coordLogit > eosLogit ? coordId : eosId
+        }
+
+        return out
+    }
+
+    private func allocateSimpleCache() -> [(MLXArray, MLXArray)] {
+        let nLayers = config.text.nLayers
+        let nKvHeads = config.text.nKvHeads
+        let headDim = config.text.dim / config.text.nHeads
+
+        #if os(iOS)
+        let maxSeqLen = 256
+        #else
+        let maxSeqLen = 1024
+        #endif
+
+        var cache: [(MLXArray, MLXArray)] = []
+        for _ in 0..<nLayers {
+            let k = MLXArray.zeros([1, nKvHeads, maxSeqLen, headDim])
+            let v = MLXArray.zeros([1, nKvHeads, maxSeqLen, headDim])
+            cache.append((k, v))
+        }
+        return cache
+    }
+
+    private func sampleToken(logits: MLXArray, temperature: Float) -> Int {
+        let logits1D = logits.squeezed(axis: 0)
+        if temperature == 0 {
+            return Int(argMax(logits1D, axis: -1).item(Int.self))
+        } else {
+            let probs = softmax(logits1D / temperature, axis: -1)
+            return Int(argMax(probs, axis: -1).item(Int.self))
+        }
+    }
+
+    public func prepare(_ input: LMInput, cache: [any KVCache], windowSize: Int?) throws -> PrepareResult {
+        let inputIds = input.text.tokens
+        let seqLen = inputIds.dim(1)
+        let positions = MLXArray((0..<seqLen).map { Int32($0) })
+        let maxCtx = config.text.maxContext
+        let mask = tril(MLXArray.ones([1, 1, maxCtx, maxCtx]).asType(.bool))
+
+        if let image = input.image {
+            let imageFeatures = visionEncoder(image.pixels)
+            let textEmbeddings = textModel.embed(inputIds)
+            let bosTokens = MLXArray([Int32(0)]).expandedDimensions(axis: 0)
+            let bosEmb = textModel.embed(bosTokens)
+            let combined = concatenated([bosEmb, imageFeatures, textEmbeddings], axis: 1)
+            let combinedLen = combined.dim(1)
+            let combinedPositions = MLXArray((0..<combinedLen).map { Int32($0) })
+            let (hidden, _) = textModel(combined, positions: combinedPositions, mask: mask, cache: nil, cachePos: 0)
+            let logits = textModel.generateLogits(hidden)
+            return .logits(LMOutput(logits: logits))
+        } else {
+            let embeddings = textModel.embed(inputIds)
+            let (hidden, _) = textModel(embeddings, positions: positions, mask: mask, cache: nil, cachePos: 0)
+            let logits = textModel.generateLogits(hidden)
+            return .logits(LMOutput(logits: logits))
+        }
+    }
+
+    public func callAsFunction(_ inputs: MLXArray, cache: [any KVCache]?) -> MLXArray {
+        let seqLen = inputs.dim(1)
+        let positions = MLXArray((0..<seqLen).map { Int32($0) })
+        let embeddings = textModel.embed(inputs)
+        let (hidden, _) = textModel(embeddings, positions: positions, mask: nil, cache: nil, cachePos: 0)
+        return textModel.generateLogits(hidden)
+    }
+
+    public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
+        var sanitized = [String: MLXArray]()
+
+        for (key, value) in weights {
+            var newKey = key
+
+            if key.contains("position_id") || key.contains("rotary_emb") {
+                continue
+            }
+
+            if newKey.contains(".mlp.fc1_bias") || newKey.contains(".mlp.fc2_bias") {
+                let components = newKey.split(separator: ".")
+                if let blocksIndex = components.firstIndex(of: "blocks"),
+                   blocksIndex + 1 < components.count,
+                   let layerNum = Int(components[blocksIndex + 1]),
+                   layerNum < 4 {
+                    newKey = newKey.replacingOccurrences(of: ".fc1_bias", with: ".fc1.bias")
+                    newKey = newKey.replacingOccurrences(of: ".fc2_bias", with: ".fc2.bias")
+                }
+            }
+
+            sanitized[newKey] = value
+        }
+
+        return sanitized
+    }
+}
+
+// MARK: - Quantized Vision Encoder
+
+private enum QuantizedVision {
+
+    class Attention: Module {
+        let numHeads: Int
+        let headDim: Int
+        let scale: Float
+
+        @ModuleInfo var qkv: QuantizedLinear
+        @ModuleInfo var proj: QuantizedLinear
+
+        init(dim: Int, numHeads: Int) {
+            self.numHeads = numHeads
+            self.headDim = dim / numHeads
+            self.scale = pow(Float(headDim), -0.5)
+
+            self.qkv = QuantizedLinear(dim, dim * 3, bias: true, groupSize: 64, bits: 4)
+            self.proj = QuantizedLinear(dim, dim, bias: true, groupSize: 64, bits: 4)
+        }
+
+        func callAsFunction(_ x: MLXArray) -> MLXArray {
+            let (B, T, C) = (x.dim(0), x.dim(1), x.dim(2))
+
+            let qkvOut = qkv(x)
+            let qkvReshaped = qkvOut.reshaped(B, T, 3, numHeads, headDim).transposed(0, 2, 3, 1, 4)
+            let q = qkvReshaped[0..., 0, 0..., 0..., 0...]
+            let k = qkvReshaped[0..., 1, 0..., 0..., 0...]
+            let v = qkvReshaped[0..., 2, 0..., 0..., 0...]
+
+            let output = MLXFast.scaledDotProductAttention(
+                queries: q, keys: k, values: v,
+                scale: scale, mask: .none
+            )
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, T, C)
+
+            return proj(output)
+        }
+    }
+
+    class MLP: Module, UnaryLayer {
+        @ModuleInfo var fc1: QuantizedLinear
+        @ModuleInfo var fc2: Linear  // fc2 kept as BF16 due to shape incompatibility (4304 % 64 != 0)
+
+        init(dim: Int, hiddenDim: Int) {
+            self.fc1 = QuantizedLinear(dim, hiddenDim, bias: true, groupSize: 64, bits: 4)
+            self.fc2 = Linear(hiddenDim, dim, bias: true)
+        }
+
+        func callAsFunction(_ x: MLXArray) -> MLXArray {
+            fc2(geluApproximate(fc1(x)))
+        }
+    }
+
+    class Block: Module {
+        @ModuleInfo var ln1: LayerNorm
+        @ModuleInfo(key: "attn") var attention: Attention
+        @ModuleInfo var ln2: LayerNorm
+        @ModuleInfo var mlp: MLP
+
+        init(dim: Int, numHeads: Int, ffDim: Int) {
+            self._ln1.wrappedValue = LayerNorm(dimensions: dim)
+            self._attention.wrappedValue = Attention(dim: dim, numHeads: numHeads)
+            self._ln2.wrappedValue = LayerNorm(dimensions: dim)
+            self.mlp = MLP(dim: dim, hiddenDim: ffDim)
+        }
+
+        func callAsFunction(_ x: MLXArray) -> MLXArray {
+            var h = x + attention(ln1(x))
+            h = h + mlp(ln2(h))
+            return h
+        }
+    }
+
+    class Encoder: Module {
+        let config: Moondream3Configuration.VisionConfiguration
+
+        // patchEmb kept as BF16 due to shape incompatibility (588 % 64 != 0, where 588 = 14*14*3)
+        @ModuleInfo(key: "patch_emb") var patchEmb: Linear
+        @ModuleInfo(key: "pos_emb") var posEmb: MLXArray
+
+        let blocks: [Block]
+        @ModuleInfo(key: "post_ln") var postLn: LayerNorm
+
+        @ModuleInfo(key: "proj_fc1") var projFc1: QuantizedLinear
+        @ModuleInfo(key: "proj_fc2") var projFc2: QuantizedLinear
+
+        init(_ config: Moondream3Configuration.VisionConfiguration) {
+            self.config = config
+
+            let patchDim = config.encPatchSize * config.encPatchSize * config.inChannels
+            // patchEmb kept as BF16 - patchDim (588 = 14*14*3) is not divisible by 64
+            self._patchEmb.wrappedValue = Linear(patchDim, config.encDim, bias: true)
+
+            let gridSize = config.cropSize / config.encPatchSize
+            let numPatches = gridSize * gridSize
+
+            self._posEmb.wrappedValue = MLXArray.zeros([1, numPatches, config.encDim])
+
+            self.blocks = (0..<config.encNLayers).map { _ in
+                Block(dim: config.encDim, numHeads: config.encNHeads, ffDim: config.encFfDim)
+            }
+            self._postLn.wrappedValue = LayerNorm(dimensions: config.encDim)
+
+            self._projFc1.wrappedValue = QuantizedLinear(config.encDim * 2, config.projInnerDim, bias: true, groupSize: 64, bits: 4)
+            self._projFc2.wrappedValue = QuantizedLinear(config.projInnerDim, config.projOutDim, bias: true, groupSize: 64, bits: 4)
+        }
+
+        func createPatches(_ x: MLXArray) -> MLXArray {
+            let (B, C, H, W) = (x.dim(0), x.dim(1), x.dim(2), x.dim(3))
+            let P = config.encPatchSize
+
+            var patches = x.reshaped(B, C, H / P, P, W / P, P)
+            patches = patches.transposed(0, 2, 4, 1, 3, 5)
+            patches = patches.reshaped(B, (H / P) * (W / P), C * P * P)
+
+            return patches
+        }
+
+        func callAsFunction(_ x: MLXArray) -> MLXArray {
+            eval(x)
+
+            var patches = createPatches(x)
+            eval(patches)
+            patches = patchEmb(patches)
+            patches = patches + posEmb
+
+            var h = patches
+            for block in blocks {
+                h = block(h)
+            }
+            h = postLn(h)
+
+            let concatenatedFeatures = concatenated([h, h], axis: -1)
+
+            let fc1Out = projFc1(concatenatedFeatures)
+            let geluOut = geluApproximate(fc1Out)
+            let projected = projFc2(geluOut)
+
+            return projected
+        }
+    }
+}
+
+// MARK: - Quantized Language Model
+
+private enum QuantizedLanguage {
+
+    class Attention: Module {
+        let dim: Int
+        let numHeads: Int
+        let numKvHeads: Int
+        let headDim: Int
+        let scale: Float
+        let qkvDim: Int
+
+        @ModuleInfo var qkv: QuantizedLinear
+        @ModuleInfo var proj: QuantizedLinear
+
+        @ModuleInfo(key: "tau_wq") var tauWq: MLXArray
+        @ModuleInfo(key: "tau_wv") var tauWv: MLXArray
+        @ModuleInfo(key: "tau_alpha") var tauAlpha: MLXArray
+
+        init(dim: Int, numHeads: Int, numKvHeads: Int) {
+            self.dim = dim
+            self.numHeads = numHeads
+            self.numKvHeads = numKvHeads
+            self.headDim = dim / numHeads
+            self.scale = pow(Float(headDim), -0.5)
+
+            let kvDim = dim * numKvHeads / numHeads
+            self.qkvDim = dim + 2 * kvDim
+
+            self.qkv = QuantizedLinear(dim, qkvDim, bias: true, groupSize: 64, bits: 4)
+            self.proj = QuantizedLinear(dim, dim, bias: true, groupSize: 64, bits: 4)
+
+            self._tauWq.wrappedValue = MLXArray.zeros([numHeads, qkvDim])
+            self._tauWv.wrappedValue = MLXArray.zeros([numHeads, qkvDim])
+            self._tauAlpha.wrappedValue = MLXArray.zeros([numHeads])
+        }
+
+        func callAsFunction(
+            _ x: MLXArray,
+            freqsCis: MLXArray,
+            positions: MLXArray,
+            mask: MLXArray?,
+            cache: (MLXArray, MLXArray)?,
+            cachePos: Int
+        ) -> (MLXArray, (MLXArray, MLXArray)) {
+            let (B, T, C) = (x.dim(0), x.dim(1), x.dim(2))
+            let qkvOut = qkv(x)
+
+            let qDim = numHeads * headDim
+            let kvDim = numKvHeads * headDim
+
+            let q = qkvOut[0..., 0..., ..<qDim]
+            let k = qkvOut[0..., 0..., qDim..<(qDim + kvDim)]
+            let v = qkvOut[0..., 0..., (qDim + kvDim)...]
+
+            var queries = q.reshaped(B, T, numHeads, headDim).transposed(0, 2, 1, 3)
+            var keys = k.reshaped(B, T, numKvHeads, headDim).transposed(0, 2, 1, 3)
+            var values = v.reshaped(B, T, numKvHeads, headDim).transposed(0, 2, 1, 3)
+
+            let tokFeat = gelu(qkvOut)
+            let tokQ = tanh(matmul(tokFeat, tauWq.T)).transposed(0, 2, 1)
+            let tokV = tanh(matmul(tokFeat, tauWv.T)).transposed(0, 2, 1)
+
+            let pos = positions.asType(.float32) + 1
+            let logPos = log(pos)
+            let tauPosScaled = expandedDimensions(tauAlpha, axis: 1) * logPos
+            let tauPos = 1 + (sigmoid(tauPosScaled) - 0.5)
+
+            let tauQ = expandedDimensions(tokQ + tauPos, axis: -1)
+            let tauV = expandedDimensions(tokV + tauPos, axis: -1)
+
+            queries = queries * tauQ
+            values = values * tauV
+
+            queries = applyRotaryEmb(queries, freqsCis: freqsCis, positions: positions)
+            keys = applyRotaryEmb(keys, freqsCis: freqsCis, positions: positions)
+
+            var newCache: (MLXArray, MLXArray)
+            if let (kCache, vCache) = cache {
+                let T = keys.dim(2)
+                let maxLen = kCache.dim(2)
+                let newEnd = cachePos + T
+
+                var updatedKCache: MLXArray
+                var updatedVCache: MLXArray
+
+                if cachePos > 0 && newEnd < maxLen {
+                    let beforeK = kCache[0..., 0..., ..<cachePos, 0...]
+                    let afterK = kCache[0..., 0..., newEnd..., 0...]
+                    updatedKCache = concatenated([beforeK, keys, afterK], axis: 2)
+
+                    let beforeV = vCache[0..., 0..., ..<cachePos, 0...]
+                    let afterV = vCache[0..., 0..., newEnd..., 0...]
+                    updatedVCache = concatenated([beforeV, values, afterV], axis: 2)
+                } else if cachePos == 0 && newEnd < maxLen {
+                    let afterK = kCache[0..., 0..., newEnd..., 0...]
+                    updatedKCache = concatenated([keys, afterK], axis: 2)
+
+                    let afterV = vCache[0..., 0..., newEnd..., 0...]
+                    updatedVCache = concatenated([values, afterV], axis: 2)
+                } else if cachePos > 0 && newEnd >= maxLen {
+                    let beforeK = kCache[0..., 0..., ..<cachePos, 0...]
+                    updatedKCache = concatenated([beforeK, keys], axis: 2)
+
+                    let beforeV = vCache[0..., 0..., ..<cachePos, 0...]
+                    updatedVCache = concatenated([beforeV, values], axis: 2)
+                } else {
+                    updatedKCache = keys
+                    updatedVCache = values
+                }
+
+                let validLen = min(newEnd, updatedKCache.dim(2))
+                keys = updatedKCache[0..., 0..., ..<validLen, 0...]
+                values = updatedVCache[0..., 0..., ..<validLen, 0...]
+
+                newCache = (updatedKCache, updatedVCache)
+            } else {
+                newCache = (keys, values)
+            }
+
+            if numKvHeads != numHeads {
+                let nRep = numHeads / numKvHeads
+                keys = repeated(keys, count: nRep, axis: 1)
+                values = repeated(values, count: nRep, axis: 1)
+            }
+
+            var output: MLXArray
+            if let mask = mask {
+                let qLen = queries.dim(2)
+                let kvLen = keys.dim(2)
+                let maskSlice = mask[0..., 0..., ..<qLen, ..<kvLen]
+
+                output = MLXFast.scaledDotProductAttention(
+                    queries: queries, keys: keys, values: values,
+                    scale: scale, mask: .array(maskSlice)
+                )
+            } else {
+                output = MLXFast.scaledDotProductAttention(
+                    queries: queries, keys: keys, values: values,
+                    scale: scale, mask: .none
+                )
+            }
+
+            output = output.transposed(0, 2, 1, 3).reshaped(B, T, C)
+            return (proj(output), newCache)
+        }
+    }
+
+    class DenseMLP: Module, UnaryLayer {
+        @ModuleInfo var fc1: QuantizedLinear
+        @ModuleInfo var fc2: QuantizedLinear
+
+        init(dim: Int, hiddenDim: Int) {
+            self.fc1 = QuantizedLinear(dim, hiddenDim, bias: true, groupSize: 64, bits: 4)
+            self.fc2 = QuantizedLinear(hiddenDim, dim, bias: true, groupSize: 64, bits: 4)
+        }
+
+        func callAsFunction(_ x: MLXArray) -> MLXArray {
+            fc2(geluApproximate(fc1(x)))
+        }
+    }
+
+    class Block: Module {
+        let layerIdx: Int
+        let isMoE: Bool
+
+        @ModuleInfo var ln: LayerNorm
+        @ModuleInfo(key: "attn") var attention: Attention
+        var mlp: UnaryLayer
+
+        init(_ config: Moondream3Configuration.TextConfiguration, layerIdx: Int) {
+            self.layerIdx = layerIdx
+            self.isMoE = config.moe.startLayer <= layerIdx
+
+            self.ln = LayerNorm(dimensions: config.dim)
+            self._attention.wrappedValue = Attention(
+                dim: config.dim,
+                numHeads: config.nHeads,
+                numKvHeads: config.nKvHeads
+            )
+
+            if isMoE {
+                self.mlp = Language.QuantizedMoEMLP(
+                    dim: config.dim,
+                    numExperts: config.moe.numExperts,
+                    expertDim: config.moe.expertInnerDim,
+                    expertsPerToken: config.moe.expertsPerToken
+                )
+            } else {
+                self.mlp = DenseMLP(dim: config.dim, hiddenDim: config.ffDim)
+            }
+        }
+
+        func callAsFunction(
+            _ x: MLXArray,
+            freqsCis: MLXArray,
+            positions: MLXArray,
+            mask: MLXArray?,
+            cache: (MLXArray, MLXArray)?,
+            cachePos: Int
+        ) -> (MLXArray, (MLXArray, MLXArray)) {
+            let h = ln(x)
+            let (attnOut, newCache) = attention(h, freqsCis: freqsCis, positions: positions, mask: mask, cache: cache, cachePos: cachePos)
+            let mlpOut = mlp(h)
+            return (x + attnOut + mlpOut, newCache)
+        }
+    }
+
+    class TextModel: Module, KVCacheDimensionProvider {
+        let config: Moondream3Configuration.TextConfiguration
+
+        @ModuleInfo(key: "wte") var wte: QuantizedEmbedding
+        let blocks: [Block]
+        @ModuleInfo(key: "post_ln") var postLn: LayerNorm
+        @ModuleInfo(key: "lm_head") var lmHead: QuantizedLinear
+
+        let freqsCis: MLXArray
+
+        var kvHeads: [Int]
+
+        init(_ config: Moondream3Configuration.TextConfiguration) {
+            self.config = config
+
+            self._wte.wrappedValue = QuantizedEmbedding(embeddingCount: config.vocabSize, dimensions: config.dim, groupSize: 64, bits: 4)
+            self.blocks = (0..<config.nLayers).map { Block(config, layerIdx: $0) }
+            self._postLn.wrappedValue = LayerNorm(dimensions: config.dim)
+            self._lmHead.wrappedValue = QuantizedLinear(config.dim, config.vocabSize, bias: true, groupSize: 64, bits: 4)
+
+            let rotDim = config.dim / (2 * config.nHeads)
+            self.freqsCis = precomputeFreqsCis(dim: rotDim, maxLen: config.maxContext)
+
+            self.kvHeads = (0..<config.nLayers).map { _ in 16 }
+        }
+
+        func embed(_ tokens: MLXArray) -> MLXArray {
+            return wte(tokens)
+        }
+
+        func callAsFunction(
+            _ embeddings: MLXArray,
+            positions: MLXArray,
+            mask: MLXArray?,
+            cache: [(MLXArray, MLXArray)]?,
+            cachePos: Int
+        ) -> (MLXArray, [(MLXArray, MLXArray)]) {
+            var x = embeddings
+            var newCaches: [(MLXArray, MLXArray)] = []
+
+            for (i, block) in blocks.enumerated() {
+                let blockCache = cache?[i]
+                let (out, newCache) = block(x, freqsCis: freqsCis, positions: positions, mask: mask, cache: blockCache, cachePos: cachePos)
+                x = out
+                newCaches.append(newCache)
+            }
+
+            return (x, newCaches)
+        }
+
+        func generateLogits(_ hidden: MLXArray) -> MLXArray {
+            let lastHidden = hidden[0..., (-1)..., 0...].squeezed(axis: 1)
+            let normed = postLn(lastHidden)
+            return lmHead(normed)
+        }
     }
 }
 

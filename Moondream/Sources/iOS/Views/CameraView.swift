@@ -37,52 +37,40 @@ struct CameraView: View {
 
             // Controls overlay
             VStack {
-                // Top bar with back button when frozen
-                if appState.isFrozen {
-                    HStack {
-                        Button {
-                            appState.resetCapture()
-                            cameraService.resume()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.white)
-                                .padding(12)
-                                .background(.ultraThinMaterial, in: Circle())
-                        }
-                        .padding(.leading, 20)
-
-                        Spacer()
-                    }
-                    .padding(.top, 60)
-                }
-
                 Spacer()
 
-                // Bottom controls
-                HStack(alignment: .bottom) {
-                    // Skill indicator
-                    SkillIndicator(skill: appState.selectedSkill)
+                // Bottom controls with Liquid Glass container
+                GlassEffectContainer {
+                    HStack(alignment: .bottom) {
+                        // Skill indicator
+                        SkillIndicator(skill: appState.selectedSkill)
+                            .frame(width: 80)
+
+                        Spacer()
+
+                        // Capture button or close button when frozen
+                        if appState.isFrozen {
+                            CloseButton {
+                                appState.resetCapture()
+                                cameraService.resume()
+                            }
+                        } else {
+                            CaptureButton(
+                                isProcessing: appState.isProcessing,
+                                isFrozen: appState.isFrozen
+                            ) {
+                                captureAndProcess()
+                            }
+                        }
+
+                        Spacer()
+
+                        // Settings button
+                        SettingsButton {
+                            appState.showSettings = true
+                        }
                         .frame(width: 80)
-
-                    Spacer()
-
-                    // Capture button
-                    CaptureButton(
-                        isProcessing: appState.isProcessing,
-                        isFrozen: appState.isFrozen
-                    ) {
-                        captureAndProcess()
                     }
-
-                    Spacer()
-
-                    // Settings button
-                    SettingsButton {
-                        appState.showSettings = true
-                    }
-                    .frame(width: 80)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
@@ -197,7 +185,7 @@ struct CameraView: View {
     }
 }
 
-/// Shows the current skill as an indicator
+/// Shows the current skill as an indicator with Liquid Glass effect
 struct SkillIndicator: View {
     let skill: Skill
 
@@ -210,25 +198,27 @@ struct SkillIndicator: View {
         }
         .foregroundStyle(.white)
         .padding(8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }
 
-/// Processing indicator overlay
+/// Processing indicator overlay with Liquid Glass effect
 struct ProcessingOverlay: View {
     var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(.circular)
-                .tint(.white)
-                .scaleEffect(1.5)
+        GlassEffectContainer {
+            VStack(spacing: 16) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
+                    .scaleEffect(1.5)
 
-            Text("Processing...")
-                .font(.headline)
-                .foregroundStyle(.white)
+                Text("Processing...")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            .padding(32)
+            .glassEffect(.regular, in: .rect(cornerRadius: 20))
         }
-        .padding(32)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 

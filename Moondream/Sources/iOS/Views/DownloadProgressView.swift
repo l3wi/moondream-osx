@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 #if os(iOS)
-/// View showing model download progress
+/// View showing model download progress with Liquid Glass styling
 struct DownloadProgressView: View {
     @Environment(AppState.self) private var appState
 
@@ -20,40 +20,47 @@ struct DownloadProgressView: View {
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
 
-            VStack(spacing: 16) {
-                if let error = appState.modelError {
-                    // Error state
-                    VStack(spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(.red)
+            // Progress/error section with Liquid Glass
+            GlassEffectContainer {
+                VStack(spacing: 16) {
+                    if let error = appState.modelError {
+                        // Error state
+                        VStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.largeTitle)
+                                .foregroundStyle(.red)
 
-                        Text("Download Failed")
-                            .font(.headline)
-                            .foregroundStyle(.white)
+                            Text("Download Failed")
+                                .font(.headline)
+                                .foregroundStyle(.white)
 
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
 
-                        Button("Retry") {
-                            appState.modelError = nil
+                            Button("Retry") {
+                                appState.modelError = nil
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .padding(.top)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .padding(.top)
-                    }
-                } else {
-                    // Progress state
-                    VStack(spacing: 12) {
-                        ProgressView(value: appState.modelDownloadProgress)
-                            .progressViewStyle(.linear)
-                            .frame(width: 250)
-                            .tint(.white)
+                        .padding(24)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+                    } else {
+                        // Progress state
+                        VStack(spacing: 12) {
+                            ProgressView(value: appState.modelDownloadProgress)
+                                .progressViewStyle(.linear)
+                                .frame(width: 250)
+                                .tint(.white)
 
-                        Text(progressText)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            Text(progressText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(24)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 16))
                     }
                 }
             }

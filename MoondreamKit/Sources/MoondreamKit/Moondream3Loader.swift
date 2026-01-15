@@ -38,19 +38,56 @@ private func fileLog(_ message: String) {
 /// Loader for Moondream3 model
 public enum Moondream3Loader {
 
-    /// Model configuration for Moondream3
-    public static let defaultConfiguration = ModelConfiguration(
+    /// Original model configuration (partially quantized MoE, BF16 vision/attention)
+    /// Use this for macOS where memory is not as constrained
+    public static let originalConfiguration = ModelConfiguration(
         id: "moondream/md3p-int4",
         defaultPrompt: "Describe this image."
     )
 
+    /// Fully quantized model configuration (int4 everywhere)
+    /// Use this for iOS where memory is limited to ~6GB
+    public static let quantizedConfiguration = ModelConfiguration(
+        id: "lewi/md3p-int4-smol",
+        defaultPrompt: "Describe this image."
+    )
+
+    /// Default configuration - uses quantized model on iOS, original on macOS
+    #if os(iOS)
+    public static let defaultConfiguration = quantizedConfiguration
+    #else
+    public static let defaultConfiguration = originalConfiguration
+    #endif
+
+    /// Get a ModelConfiguration for a specific model ID
+    /// - Parameter modelId: The HuggingFace model ID (e.g., "moondream/md3p-int4")
+    /// - Returns: A ModelConfiguration for the specified model
+    public static func configuration(for modelId: String) -> ModelConfiguration {
+        ModelConfiguration(
+            id: modelId,
+            defaultPrompt: "Describe this image."
+        )
+    }
+
     /// Load the Moondream3 model and create a ModelContext
+    /// Automatically uses the appropriate model class based on the configuration
     public static func load(
         configuration: ModelConfiguration = defaultConfiguration,
         hub: HubApi = HubApi(),
         progressHandler: @Sendable @escaping (Progress) -> Void = { _ in }
     ) async throws -> ModelContext {
         fileLog("=== Moondream3Loader.load() started ===")
+
+        // Determine if this is the fully quantized model
+        let isQuantizedModel: Bool
+        switch configuration.id {
+        case .id(let id, _):
+            isQuantizedModel = id.contains("md3p-int4-smol") || id.contains("lewi/")
+            fileLog("[Moondream3Loader] Model ID: \(id), quantized: \(isQuantizedModel)")
+        case .directory:
+            // For local directories, we'll detect from weights later
+            isQuantizedModel = false
+        }
 
         // Download model files from HuggingFace
         let modelDirectory = try await downloadModel(
@@ -64,11 +101,19 @@ public enum Moondream3Loader {
         let configData = try Data(contentsOf: configURL)
         let modelConfig = try JSONDecoder().decode(Moondream3Configuration.self, from: configData)
 
-        // Create model
-        let model = Moondream3(modelConfig)
-
-        // Load weights
-        try loadWeights(into: model, from: modelDirectory)
+        // Create appropriate model based on quantization
+        let model: any LanguageModel
+        if isQuantizedModel {
+            fileLog("[Moondream3Loader] Creating quantized model (Moondream3Quantized)")
+            let quantizedModel = Moondream3Quantized(modelConfig)
+            try loadWeightsQuantized(into: quantizedModel, from: modelDirectory)
+            model = quantizedModel
+        } else {
+            fileLog("[Moondream3Loader] Creating standard model (Moondream3)")
+            let standardModel = Moondream3(modelConfig)
+            try loadWeights(into: standardModel, from: modelDirectory)
+            model = standardModel
+        }
 
         // Load tokenizer from the already-downloaded model directory
         fileLog("[Moondream3Loader] Loading tokenizer from \(modelDirectory.path)")
@@ -220,6 +265,47 @@ public enum Moondream3Loader {
         // NOTE: Removed eval(model) - MLX will lazily evaluate weights on first inference
         // Calling eval() here caused OOM by forcing all ~2GB weights to GPU at once
         fileLog("[Moondream3Loader] Model ready (weights will evaluate lazily)")
+    }
+
+    private static func loadWeightsQuantized(into model: Moondream3Quantized, from directory: URL) throws {
+        // Find all safetensors files
+        let fileManager = FileManager.default
+        let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        let weightFiles = contents.filter { $0.pathExtension == "safetensors" }.sorted { $0.path < $1.path }
+
+        guard !weightFiles.isEmpty else {
+            throw Moondream3LoaderError.noWeightFiles
+        }
+
+        fileLog("[Moondream3Loader] Found \(weightFiles.count) weight files (quantized model)")
+
+        // Process weights incrementally to reduce peak memory
+        var totalKeys = 0
+
+        for (index, weightFile) in weightFiles.enumerated() {
+            fileLog("[Moondream3Loader] Loading [\(index + 1)/\(weightFiles.count)]: \(weightFile.lastPathComponent)")
+
+            // Load this shard's weights
+            let weights = try MLX.loadArrays(url: weightFile)
+            totalKeys += weights.count
+
+            // Sanitize this shard
+            let sanitizedWeights = model.sanitize(weights: weights)
+
+            // Apply this shard's weights
+            let parameters = ModuleParameters.unflattened(sanitizedWeights)
+            do {
+                try model.update(parameters: parameters, verify: .none)
+            } catch {
+                fileLog("[Moondream3Loader] ERROR applying weights from \(weightFile.lastPathComponent): \(error)")
+                throw error
+            }
+
+            fileLog("[Moondream3Loader] Applied \(sanitizedWeights.count) weights from \(weightFile.lastPathComponent)")
+        }
+
+        fileLog("[Moondream3Loader] Loaded \(totalKeys) total raw weight keys (quantized)")
+        fileLog("[Moondream3Loader] Quantized model ready (weights will evaluate lazily)")
     }
 
     private static func loadTokenizer(

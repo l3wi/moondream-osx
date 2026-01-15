@@ -4,7 +4,7 @@ import MoondreamKit
 #if os(iOS)
 import UIKit
 
-/// Sheet displaying inference results
+/// Sheet displaying inference results with Liquid Glass styling
 struct ResultsSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -104,7 +104,7 @@ struct ResultsSheet: View {
     }
 }
 
-/// Query input section
+/// Query input section with Liquid Glass styling
 struct QueryInputSection: View {
     @Binding var queryText: String
     var isQueryFocused: FocusState<Bool>.Binding
@@ -124,7 +124,7 @@ struct QueryInputSection: View {
                 .onSubmit(onSubmit)
         }
         .padding()
-        .background(Color(uiColor: .systemGroupedBackground))
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }
 
@@ -197,7 +197,7 @@ struct ResultSection: View {
     }
 }
 
-/// Detail for a single point
+/// Detail for a single point with Liquid Glass styling
 struct PointDetail: View {
     let index: Int
     let point: NormalizedPoint
@@ -217,12 +217,11 @@ struct PointDetail: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(8)
+        .glassEffect(.regular, in: .rect(cornerRadius: 8))
     }
 }
 
-/// Detail for a single bounding box
+/// Detail for a single bounding box with Liquid Glass styling
 struct BoxDetail: View {
     let index: Int
     let box: NormalizedBox
@@ -250,12 +249,11 @@ struct BoxDetail: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(8)
+        .glassEffect(.regular, in: .rect(cornerRadius: 8))
     }
 }
 
-/// Debug output section
+/// Debug output section with subtle Liquid Glass styling
 struct DebugOutputSection: View {
     let result: MoondreamResult
 
@@ -275,8 +273,7 @@ struct DebugOutputSection: View {
                     .textSelection(.enabled)
             }
             .padding(8)
-            .background(Color(uiColor: .tertiarySystemGroupedBackground))
-            .cornerRadius(8)
+            .glassEffect(.clear, in: .rect(cornerRadius: 8))
         }
     }
 
