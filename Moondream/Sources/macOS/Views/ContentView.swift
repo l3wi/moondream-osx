@@ -14,17 +14,23 @@ extension View {
     }
 }
 
-/// Main content view that switches between empty and loaded states
+/// Main content view that switches between empty, webcam, and loaded states
 struct ContentView: View {
     @EnvironmentObject var service: MoondreamService
     @State private var droppedImage: NSImage?
+    @State private var isWebcamMode: Bool = false
 
     var body: some View {
         Group {
-            if droppedImage != nil {
+            if isWebcamMode {
+                WebcamCaptureView(
+                    droppedImage: $droppedImage,
+                    isWebcamMode: $isWebcamMode
+                )
+            } else if droppedImage != nil {
                 ImageLoadedView(droppedImage: $droppedImage)
             } else {
-                EmptyStateView(droppedImage: $droppedImage)
+                EmptyStateView(droppedImage: $droppedImage, isWebcamMode: $isWebcamMode)
             }
         }
         .frame(minWidth: 800, minHeight: 600)

@@ -50,9 +50,10 @@ struct ToolbarPanel: View {
             Divider()
                 .padding(.horizontal, 16)
 
-            // Run button
+            // Run button - always enabled, shows Loading/Running states
             RunButton(
-                isEnabled: service.isLoaded,
+                isEnabled: true,
+                isLoading: service.isLoading,
                 isProcessing: isProcessing,
                 action: onRun
             )

@@ -76,6 +76,36 @@ final class MoondreamService: ObservableObject {
     /// Currently loaded model ID
     private var loadedModelId: String?
 
+    // MARK: - Memory Management (macOS only)
+
+    #if os(macOS)
+    /// Timer for unloading model after inactivity
+    private var unloadTimer: Timer?
+
+    /// Timeout duration before unloading model (60 seconds)
+    private let unloadTimeout: TimeInterval = 60
+
+    /// Resets the inactivity timer - call after each inference
+    private func resetUnloadTimer() {
+        unloadTimer?.invalidate()
+        unloadTimer = Timer.scheduledTimer(withTimeInterval: unloadTimeout, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.scheduleUnload()
+            }
+        }
+        fileLog("Unload timer reset - model will unload in \(Int(unloadTimeout))s if idle")
+    }
+
+    /// Called when inactivity timeout expires
+    private func scheduleUnload() {
+        guard modelContainer != nil else { return }
+        fileLog("Inactivity timeout reached - unloading model to free memory")
+        unloadModel()
+        GPU.clearCache()
+        fileLog("Model unloaded and GPU cache cleared")
+    }
+    #endif
+
     // MARK: - Model Loading
 
     /// Load the Moondream3 model with specific model ID, downloading if necessary
@@ -139,6 +169,11 @@ final class MoondreamService: ObservableObject {
 
     /// Query skill - ask questions about an image using direct model inference
     func query(image: CIImage, question: String) async throws -> QueryResult {
+        // Auto-reload model if it was unloaded due to inactivity
+        if modelContainer == nil {
+            fileLog("Model not loaded - auto-reloading for query")
+            try await loadModel()
+        }
         guard let container = modelContainer else {
             throw MoondreamError.modelNotLoaded
         }
@@ -199,6 +234,9 @@ final class MoondreamService: ObservableObject {
         // Clear GPU cache after inference to free memory
         GPU.clearCache()
         fileLog("GPU cache cleared")
+        #elseif os(macOS)
+        // Reset inactivity timer after successful inference
+        resetUnloadTimer()
         #endif
 
         return QueryResult(answer: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
@@ -206,6 +244,11 @@ final class MoondreamService: ObservableObject {
 
     /// Caption skill - generate image description using direct model inference
     func caption(image: CIImage, length: CaptionLength) async throws -> CaptionResult {
+        // Auto-reload model if it was unloaded due to inactivity
+        if modelContainer == nil {
+            fileLog("Model not loaded - auto-reloading for caption")
+            try await loadModel()
+        }
         guard let container = modelContainer else {
             throw MoondreamError.modelNotLoaded
         }
@@ -273,6 +316,8 @@ final class MoondreamService: ObservableObject {
         #if os(iOS)
         GPU.clearCache()
         fileLog("GPU cache cleared")
+        #elseif os(macOS)
+        resetUnloadTimer()
         #endif
 
         return CaptionResult(caption: output.trimmingCharacters(in: .whitespacesAndNewlines), rawOutput: output)
@@ -280,6 +325,11 @@ final class MoondreamService: ObservableObject {
 
     /// Point skill - locate objects by coordinates using direct model inference
     func point(image: CIImage, object: String) async throws -> PointResult {
+        // Auto-reload model if it was unloaded due to inactivity
+        if modelContainer == nil {
+            fileLog("Model not loaded - auto-reloading for point")
+            try await loadModel()
+        }
         guard let container = modelContainer else {
             throw MoondreamError.modelNotLoaded
         }
@@ -339,6 +389,8 @@ final class MoondreamService: ObservableObject {
         #if os(iOS)
         GPU.clearCache()
         fileLog("GPU cache cleared")
+        #elseif os(macOS)
+        resetUnloadTimer()
         #endif
 
         let points = parsePointResponse(output)
@@ -347,6 +399,11 @@ final class MoondreamService: ObservableObject {
 
     /// Detect skill - detect objects with bounding boxes using direct model inference
     func detect(image: CIImage, object: String) async throws -> DetectResult {
+        // Auto-reload model if it was unloaded due to inactivity
+        if modelContainer == nil {
+            fileLog("Model not loaded - auto-reloading for detect")
+            try await loadModel()
+        }
         guard let container = modelContainer else {
             throw MoondreamError.modelNotLoaded
         }
@@ -406,6 +463,8 @@ final class MoondreamService: ObservableObject {
         #if os(iOS)
         GPU.clearCache()
         fileLog("GPU cache cleared")
+        #elseif os(macOS)
+        resetUnloadTimer()
         #endif
 
         let boxes = parseDetectResponse(output)

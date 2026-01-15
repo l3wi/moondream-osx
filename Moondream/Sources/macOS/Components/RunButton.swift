@@ -3,13 +3,24 @@ import SwiftUI
 /// Primary action button for running inference
 struct RunButton: View {
     let isEnabled: Bool
-    let isProcessing: Bool
+    let isLoading: Bool    // Model loading state
+    let isProcessing: Bool // Inference processing state
     let action: () -> Void
+
+    private var buttonText: String {
+        if isLoading { return "Loading..." }
+        if isProcessing { return "Running..." }
+        return "Run"
+    }
+
+    private var isWorking: Bool {
+        isLoading || isProcessing
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if isProcessing {
+                if isWorking {
                     ProgressView()
                         .scaleEffect(0.7)
                         .frame(width: 16, height: 16)
@@ -18,7 +29,7 @@ struct RunButton: View {
                         .font(.system(size: 12))
                 }
 
-                Text(isProcessing ? "Processing..." : "Run")
+                Text(buttonText)
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
@@ -26,15 +37,16 @@ struct RunButton: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
-        .disabled(!isEnabled || isProcessing)
+        .disabled(!isEnabled || isWorking)
     }
 }
 
 #Preview {
     VStack(spacing: 20) {
-        RunButton(isEnabled: true, isProcessing: false, action: {})
-        RunButton(isEnabled: true, isProcessing: true, action: {})
-        RunButton(isEnabled: false, isProcessing: false, action: {})
+        RunButton(isEnabled: true, isLoading: false, isProcessing: false, action: {})
+        RunButton(isEnabled: true, isLoading: true, isProcessing: false, action: {})
+        RunButton(isEnabled: true, isLoading: false, isProcessing: true, action: {})
+        RunButton(isEnabled: false, isLoading: false, isProcessing: false, action: {})
     }
     .padding()
     .frame(width: 300)

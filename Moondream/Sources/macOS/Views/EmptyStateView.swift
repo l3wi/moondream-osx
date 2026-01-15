@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 /// Empty state view with drop zone for loading images
 struct EmptyStateView: View {
     @Binding var droppedImage: NSImage?
+    @Binding var isWebcamMode: Bool
     @State private var isTargeted = false
 
     var body: some View {
@@ -50,6 +51,17 @@ struct EmptyStateView: View {
 
                 Button("Choose Image...") {
                     openFilePicker()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+
+                Button {
+                    isWebcamMode = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                        Text("Use Webcam")
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
