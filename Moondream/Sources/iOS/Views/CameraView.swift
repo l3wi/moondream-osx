@@ -39,22 +39,27 @@ struct CameraView: View {
             VStack {
                 Spacer()
 
-                // Bottom controls with Liquid Glass container
-                GlassEffectContainer {
-                    HStack(alignment: .bottom) {
-                        // Skill indicator
-                        SkillIndicator(skill: appState.selectedSkill)
-                            .frame(width: 80)
+                // Bottom controls
+                HStack(alignment: .bottom) {
+                    // Skill selector (expands upward and rightward, bottom-left anchored)
+                    // Fixed 56x56 footprint - expanded menu overlays without shifting layout
+                    SkillSelectorButton(selectedSkill: Binding(
+                        get: { appState.selectedSkill },
+                        set: { appState.selectedSkill = $0 }
+                    ))
 
-                        Spacer()
+                    Spacer()
 
-                        // Capture button or close button when frozen
-                        if appState.isFrozen {
+                    // Capture button or close button
+                    GlassEffectContainer {
+                        if appState.isFrozen && appState.currentResult != nil && !appState.isProcessing {
+                            // Show close button only after we have results
                             CloseButton {
                                 appState.resetCapture()
                                 cameraService.resume()
                             }
                         } else {
+                            // Show capture button (with spinner when processing)
                             CaptureButton(
                                 isProcessing: appState.isProcessing,
                                 isFrozen: appState.isFrozen
@@ -62,23 +67,40 @@ struct CameraView: View {
                                 captureAndProcess()
                             }
                         }
+                    }
 
-                        Spacer()
+                    Spacer()
 
-                        // Settings button
-                        SettingsButton {
-                            appState.showSettings = true
-                        }
-                        .frame(width: 80)
+                    // Settings button
+                    SettingsButton {
+                        appState.showSettings = true
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
             }
 
-            // Processing indicator
-            if appState.isProcessing {
-                ProcessingOverlay()
+            // Input modal overlay (centered floating modal)
+            if appState.showInputModal {
+                InputModal(
+                    skill: appState.selectedSkill,
+                    onSubmit: {
+                        // Run inference with captured image
+                        if let image = appState.capturedImage {
+                            Task {
+                                await runInference(image: image)
+                            }
+                        }
+                    },
+                    onDismiss: {
+                        // User dismissed without running - reset capture
+                        appState.showInputModal = false
+                        appState.resetCapture()
+                        cameraService.resume()
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .animation(.easeOut(duration: 0.2), value: appState.showInputModal)
             }
         }
         .onAppear {
@@ -128,11 +150,11 @@ struct CameraView: View {
 
         appState.prepareCapture(image: frame)
 
-        if appState.selectedSkill == .query {
-            // For query, show results sheet first to get question
-            appState.showResults = true
+        if appState.selectedSkill.requiresInput {
+            // Show input modal for skills needing text input
+            appState.showInputModal = true
         } else {
-            // For other skills, run inference immediately
+            // For caption, run inference immediately
             Task {
                 await runInference(image: frame)
             }
@@ -176,29 +198,17 @@ struct CameraView: View {
             }
 
             appState.currentResult = result
-            appState.showResults = true
+
+            // Only show results sheet for caption and query
+            // Point and detect render interactive overlays on the image
+            if appState.selectedSkill == .caption || appState.selectedSkill == .query {
+                appState.showResults = true
+            }
         } catch {
             appState.modelError = error.localizedDescription
         }
 
         appState.isProcessing = false
-    }
-}
-
-/// Shows the current skill as an indicator with Liquid Glass effect
-struct SkillIndicator: View {
-    let skill: Skill
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: skill.icon)
-                .font(.title3)
-            Text(skill.displayName)
-                .font(.caption2)
-        }
-        .foregroundStyle(.white)
-        .padding(8)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }
 

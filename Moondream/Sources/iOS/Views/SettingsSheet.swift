@@ -85,23 +85,8 @@ struct SettingsSheet: View {
                     }
                 }
 
-                // Skill selection
-                Section {
-                    ForEach(Skill.allCases) { skill in
-                        SkillRow(
-                            skill: skill,
-                            isSelected: appState.selectedSkill == skill
-                        ) {
-                            state.selectedSkill = skill
-                        }
-                    }
-                } header: {
-                    Text("Skill")
-                }
-
                 // Skill-specific options
-                switch appState.selectedSkill {
-                case .caption:
+                if appState.selectedSkill == .caption {
                     Section {
                         Picker("Length", selection: $state.captionLength) {
                             ForEach(CaptionLength.allCases) { length in
@@ -111,26 +96,6 @@ struct SettingsSheet: View {
                         .pickerStyle(.segmented)
                     } header: {
                         Text("Caption Length")
-                    }
-
-                case .point, .detect:
-                    Section {
-                        TextField("e.g., person, car, dog", text: $state.targetObject)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    } header: {
-                        Text("Object to Find")
-                    } footer: {
-                        Text("Enter what you want to \(appState.selectedSkill == .point ? "locate" : "detect") in the image")
-                    }
-
-                case .query:
-                    Section {
-                        Text("You'll be prompted to enter your question after capturing an image")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } header: {
-                        Text("Query Mode")
                     }
                 }
 
@@ -222,45 +187,6 @@ struct SettingsSheet: View {
         }
 
         appState.downloadingModelId = nil
-    }
-}
-
-/// Row for skill selection
-struct SkillRow: View {
-    let skill: Skill
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: skill.icon)
-                    .font(.title2)
-                    .foregroundStyle(isSelected ? .blue : .secondary)
-                    .frame(width: 32)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(skill.displayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-
-                    Text(skill.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.blue)
-                        .fontWeight(.semibold)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 

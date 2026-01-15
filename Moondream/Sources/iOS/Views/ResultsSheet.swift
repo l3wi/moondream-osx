@@ -8,28 +8,14 @@ import UIKit
 struct ResultsSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var moondreamService = MoondreamService.shared
-
-    @FocusState private var isQueryFocused: Bool
 
     var body: some View {
-        @Bindable var state = appState
-
         NavigationStack {
             VStack(spacing: 0) {
-                // Query input (only for query skill before inference)
-                if appState.selectedSkill == .query && appState.currentResult == nil {
-                    QueryInputSection(
-                        queryText: $state.queryText,
-                        isQueryFocused: $isQueryFocused,
-                        onSubmit: submitQuery
-                    )
-                }
-
                 // Results content
                 if let result = appState.currentResult {
                     ResultsContent(result: result, debugMode: appState.debugMode)
-                } else if appState.selectedSkill != .query {
+                } else {
                     // Waiting for results
                     VStack(spacing: 16) {
                         ProgressView()
@@ -47,26 +33,11 @@ struct ResultsSheet: View {
                         dismiss()
                     }
                 }
-
-                if appState.selectedSkill == .query && appState.currentResult == nil {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Ask") {
-                            submitQuery()
-                        }
-                        .disabled(appState.queryText.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .fontWeight(.semibold)
-                    }
-                }
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(appState.isProcessing)
-        .onAppear {
-            if appState.selectedSkill == .query && appState.currentResult == nil {
-                isQueryFocused = true
-            }
-        }
     }
 
     private var navigationTitle: String {
@@ -76,55 +47,6 @@ struct ResultsSheet: View {
         case .point: "Points"
         case .detect: "Detection"
         }
-    }
-
-    private func submitQuery() {
-        guard !appState.queryText.trimmingCharacters(in: .whitespaces).isEmpty,
-              let image = appState.capturedImage else {
-            return
-        }
-
-        isQueryFocused = false
-
-        Task {
-            appState.isProcessing = true
-
-            do {
-                let result = try await moondreamService.query(
-                    image: image,
-                    question: appState.queryText
-                )
-                appState.currentResult = .query(result)
-            } catch {
-                appState.modelError = error.localizedDescription
-            }
-
-            appState.isProcessing = false
-        }
-    }
-}
-
-/// Query input section with Liquid Glass styling
-struct QueryInputSection: View {
-    @Binding var queryText: String
-    var isQueryFocused: FocusState<Bool>.Binding
-    let onSubmit: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Ask a question about the image:")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            TextField("What is in this image?", text: $queryText, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(3...6)
-                .focused(isQueryFocused)
-                .submitLabel(.send)
-                .onSubmit(onSubmit)
-        }
-        .padding()
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }
 

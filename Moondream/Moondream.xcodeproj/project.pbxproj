@@ -59,6 +59,8 @@
 		IOS0000100000000000000011 /* ModelDownloadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = IOSREF0100000000000011 /* ModelDownloadView.swift */; };
 		IOS0000100000000000000012 /* ModelRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = IOSREF0100000000000012 /* ModelRow.swift */; };
 		IOS0000100000000000000013 /* CloseButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = IOSREF0100000000000013 /* CloseButton.swift */; };
+		IOS0000100000000000000014 /* SkillSelectorButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = IOSREF0100000000000014 /* SkillSelectorButton.swift */; };
+		IOS0000100000000000000015 /* InputModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = IOSREF0100000000000015 /* InputModal.swift */; };
 		IOS0000200000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7317A6871E66D01F2B73C468 /* Assets.xcassets */; };
 		IOS0000300000000000000003 /* OverlayModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8023E1672CF029F67F0B8B3D /* OverlayModels.swift */; };
 		IOS0000300000000000000005 /* MoondreamService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3A1117804DBF73FE69995A /* MoondreamService.swift */; };
@@ -101,6 +103,8 @@
 		IOSREF0100000000000011 /* ModelDownloadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadView.swift; sourceTree = "<group>"; };
 		IOSREF0100000000000012 /* ModelRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelRow.swift; sourceTree = "<group>"; };
 		IOSREF0100000000000013 /* CloseButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloseButton.swift; sourceTree = "<group>"; };
+		IOSREF0100000000000014 /* SkillSelectorButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillSelectorButton.swift; sourceTree = "<group>"; };
+		IOSREF0100000000000015 /* InputModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModal.swift; sourceTree = "<group>"; };
 		IOSREF0300000000000001 /* Moondream.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Moondream.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -259,6 +263,7 @@
 				IOSREF010000000000000A /* OverlayView.swift */,
 				IOSREF0100000000000010 /* OverlayDetailSheet.swift */,
 				IOSREF0100000000000011 /* ModelDownloadView.swift */,
+				IOSREF0100000000000015 /* InputModal.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -271,6 +276,7 @@
 				IOSREF010000000000000D /* CaptureButton.swift */,
 				IOSREF0100000000000013 /* CloseButton.swift */,
 				IOSREF010000000000000E /* SettingsButton.swift */,
+				IOSREF0100000000000014 /* SkillSelectorButton.swift */,
 				IOSREF0100000000000012 /* ModelRow.swift */,
 			);
 			path = Components;
@@ -457,6 +463,8 @@
 				IOS000010000000000000000C /* PointMarkerView.swift in Sources */,
 				IOS000010000000000000000D /* CaptureButton.swift in Sources */,
 				IOS0000100000000000000013 /* CloseButton.swift in Sources */,
+				IOS0000100000000000000014 /* SkillSelectorButton.swift in Sources */,
+				IOS0000100000000000000015 /* InputModal.swift in Sources */,
 				IOS000010000000000000000E /* SettingsButton.swift in Sources */,
 				IOS000010000000000000000F /* AppState.swift in Sources */,
 				IOS0000300000000000000003 /* OverlayModels.swift in Sources */,
