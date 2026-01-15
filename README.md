@@ -2,6 +2,8 @@
 
 Vision-language model implementations using Apple's MLX framework for on-device inference.
 
+![Moondream UI](images/ui.png)
+
 ## Components
 
 | Component | Platform | Status |
