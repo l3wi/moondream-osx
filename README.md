@@ -94,7 +94,7 @@ xcodebuild -scheme Moondream-iOS -destination 'generic/platform=iOS Simulator' b
 
 ## Integrating MoondreamKit
 
-MoondreamKit is a standalone Swift package you can integrate into your own apps. The package follows a modular architecture with 38 focused files organized by component (Vision, Language, Region, Generation).
+MoondreamKit is a standalone Swift package you can integrate into your own apps. The package follows a modular architecture with 20 consolidated files organized by component (Core, Vision, Language, Region, Inference, Model).
 
 ### Installation
 
