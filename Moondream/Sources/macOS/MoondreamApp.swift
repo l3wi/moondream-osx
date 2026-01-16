@@ -41,7 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // CLI runner as a separate class to avoid escaping closure issues
 @MainActor
 class CLIRunner {
-    static func run(imagePath: String, skill: String, query: String) async {
+    static func run(imagePath: String, skill: String, query: String, modelId: String?) async {
         let service = MoondreamService.shared
 
         print("MoondreamMac CLI")
@@ -50,6 +50,9 @@ class CLIRunner {
         print("Skill: \(skill)")
         if skill == "query" || skill == "point" || skill == "detect" {
             print("Query: \(query)")
+        }
+        if let modelId = modelId {
+            print("Model: \(modelId)")
         }
         print("")
 
@@ -69,7 +72,7 @@ class CLIRunner {
         // Load model
         print("Loading model...")
         do {
-            try await service.loadModel()
+            try await service.loadModel(modelId: modelId)
             print("Model loaded successfully!")
             print("")
         } catch {
@@ -148,12 +151,33 @@ struct MoondreamMacApp: App {
 
         if args.count > 1 {
             // CLI mode: run inference and exit
-            let imagePath = args[1]
-            let skill = args.count > 2 ? args[2] : "caption"
-            let query = args.count > 3 ? args[3] : "What is in this image?"
+            // Parse --model argument
+            var modelId: String? = nil
+            var positionalArgs: [String] = []
+
+            var i = 1
+            while i < args.count {
+                if args[i] == "--model" && i + 1 < args.count {
+                    modelId = args[i + 1]
+                    i += 2
+                } else {
+                    positionalArgs.append(args[i])
+                    i += 1
+                }
+            }
+
+            guard !positionalArgs.isEmpty else {
+                print("Usage: MoondreamMac <image> [skill] [query] [--model <model-id>]")
+                print("Models: moondream/md3p-int4, lewi/md3p-int4-smol, moondream/moondream3-preview")
+                exit(1)
+            }
+
+            let imagePath = positionalArgs[0]
+            let skill = positionalArgs.count > 1 ? positionalArgs[1] : "caption"
+            let query = positionalArgs.count > 2 ? positionalArgs[2] : "What is in this image?"
 
             Task { @MainActor in
-                await CLIRunner.run(imagePath: imagePath, skill: skill, query: query)
+                await CLIRunner.run(imagePath: imagePath, skill: skill, query: query, modelId: modelId)
                 exit(0)
             }
             // Keep running until task completes

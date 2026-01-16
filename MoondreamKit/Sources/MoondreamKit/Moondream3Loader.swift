@@ -59,14 +59,30 @@ public enum Moondream3Loader {
     public static let defaultConfiguration = originalConfiguration
     #endif
 
-    /// Get a ModelConfiguration for a specific model ID
-    /// - Parameter modelId: The HuggingFace model ID (e.g., "moondream/md3p-int4")
+    /// Get a ModelConfiguration for a specific model ID or local directory path
+    /// - Parameter modelId: The HuggingFace model ID (e.g., "moondream/md3p-int4") or local directory path
     /// - Returns: A ModelConfiguration for the specified model
     public static func configuration(for modelId: String) -> ModelConfiguration {
-        ModelConfiguration(
+        // Check if it's a local directory path
+        if modelId.hasPrefix("/") || modelId.hasPrefix("./") || modelId.hasPrefix("~") {
+            let expandedPath = (modelId as NSString).expandingTildeInPath
+            let url = URL(fileURLWithPath: expandedPath)
+            return ModelConfiguration(
+                directory: url,
+                defaultPrompt: "Describe this image."
+            )
+        }
+        // Otherwise treat as HuggingFace model ID
+        return ModelConfiguration(
             id: modelId,
             defaultPrompt: "Describe this image."
         )
+    }
+
+    /// Model type for loading
+    private enum ModelType {
+        case standard    // moondream/md3p-int4 (MoE int4, Vision/Attention BF16) - also handles int8 via config.bits
+        case quantized   // lewi/md3p-int4-smol (fully int4)
     }
 
     /// Load the Moondream3 model and create a ModelContext
@@ -78,15 +94,21 @@ public enum Moondream3Loader {
     ) async throws -> ModelContext {
         fileLog("=== Moondream3Loader.load() started ===")
 
-        // Determine if this is the fully quantized model
-        let isQuantizedModel: Bool
+        // Determine model type from configuration
+        let modelType: ModelType
         switch configuration.id {
         case .id(let id, _):
-            isQuantizedModel = id.contains("md3p-int4-smol") || id.contains("lewi/")
-            fileLog("[Moondream3Loader] Model ID: \(id), quantized: \(isQuantizedModel)")
-        case .directory:
-            // For local directories, we'll detect from weights later
-            isQuantizedModel = false
+            if id.contains("md3p-int4-smol") || id.contains("lewi/") {
+                modelType = .quantized
+                fileLog("[Moondream3Loader] Model ID: \(id), type: quantized")
+            } else {
+                modelType = .standard
+                fileLog("[Moondream3Loader] Model ID: \(id), type: standard")
+            }
+        case .directory(let url):
+            // For local directories, check config.json to determine model type
+            modelType = detectModelType(from: url)
+            fileLog("[Moondream3Loader] Local directory: \(url.path), detected type: \(modelType)")
         }
 
         // Download model files from HuggingFace
@@ -101,14 +123,15 @@ public enum Moondream3Loader {
         let configData = try Data(contentsOf: configURL)
         let modelConfig = try JSONDecoder().decode(Moondream3Configuration.self, from: configData)
 
-        // Create appropriate model based on quantization
+        // Create appropriate model based on type
         let model: any LanguageModel
-        if isQuantizedModel {
+        switch modelType {
+        case .quantized:
             fileLog("[Moondream3Loader] Creating quantized model (Moondream3Quantized)")
             let quantizedModel = Moondream3Quantized(modelConfig)
             try loadWeightsQuantized(into: quantizedModel, from: modelDirectory)
             model = quantizedModel
-        } else {
+        case .standard:
             fileLog("[Moondream3Loader] Creating standard model (Moondream3)")
             let standardModel = Moondream3(modelConfig)
             try loadWeights(into: standardModel, from: modelDirectory)
@@ -148,6 +171,35 @@ public enum Moondream3Loader {
     }
 
     // MARK: - Private Methods
+
+    /// Detect model type from a local directory by reading config.json
+    /// Standard model handles both int4 and int8 via config.text.bits
+    private static func detectModelType(from directory: URL) -> ModelType {
+        let configURL = directory.appendingPathComponent("config.json")
+
+        guard FileManager.default.fileExists(atPath: configURL.path),
+              let data = try? Data(contentsOf: configURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            fileLog("[Moondream3Loader] Could not read config.json, defaulting to standard")
+            return .standard
+        }
+
+        // Check if text config has group_size=32 (indicates quantization)
+        // Also check region for full quantization (lewi/md3p-int4-smol)
+        if let textConfig = json["text"] as? [String: Any],
+           let groupSize = textConfig["group_size"] as? Int,
+           groupSize == 32,
+           let regionConfig = json["region"] as? [String: Any],
+           let regionGroupSize = regionConfig["group_size"] as? Int,
+           regionGroupSize == 32 {
+            fileLog("[Moondream3Loader] Detected fully quantized model")
+            return .quantized
+        }
+
+        // Default to standard (handles int4 and int8 via config.bits)
+        fileLog("[Moondream3Loader] Defaulting to standard model type")
+        return .standard
+    }
 
     private static func downloadModel(
         configuration: ModelConfiguration,

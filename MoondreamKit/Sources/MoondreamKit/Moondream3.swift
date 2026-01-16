@@ -58,6 +58,8 @@ public struct Moondream3Configuration: Codable, Sendable {
         public let nKvHeads: Int
         public let prefixAttn: Int
         public let moe: MoEConfiguration
+        public let bits: Int?
+        public let groupSize: Int?
 
         enum CodingKeys: String, CodingKey {
             case dim
@@ -69,6 +71,8 @@ public struct Moondream3Configuration: Codable, Sendable {
             case nKvHeads = "n_kv_heads"
             case prefixAttn = "prefix_attn"
             case moe
+            case bits
+            case groupSize = "group_size"
         }
     }
 
@@ -586,12 +590,12 @@ private enum Language {
         @ModuleInfo(key: "fc2_scales") var fc2Scales: MLXArray
         @ModuleInfo(key: "fc2_biases") var fc2Biases: MLXArray
 
-        init(dim: Int, numExperts: Int, expertDim: Int, expertsPerToken: Int) {
+        init(dim: Int, numExperts: Int, expertDim: Int, expertsPerToken: Int, bits: Int = 4) {
             self.dim = dim
             self.numExperts = numExperts
             self.expertDim = expertDim
             self.expertsPerToken = expertsPerToken
-            self.bits = 4
+            self.bits = bits
             self.groupSize = 64
 
             self.router = Linear(dim, numExperts, bias: true)
@@ -727,7 +731,8 @@ private enum Language {
                     dim: config.dim,
                     numExperts: config.moe.numExperts,
                     expertDim: config.moe.expertInnerDim,
-                    expertsPerToken: config.moe.expertsPerToken
+                    expertsPerToken: config.moe.expertsPerToken,
+                    bits: config.bits ?? 4  // Support int4 (default) or int8
                 )
             } else {
                 self.mlp = DenseMLP(dim: config.dim, hiddenDim: config.ffDim)
@@ -2419,7 +2424,8 @@ private enum QuantizedLanguage {
                     dim: config.dim,
                     numExperts: config.moe.numExperts,
                     expertDim: config.moe.expertInnerDim,
-                    expertsPerToken: config.moe.expertsPerToken
+                    expertsPerToken: config.moe.expertsPerToken,
+                    bits: config.bits ?? 4  // Support int4 (default) or int8
                 )
             } else {
                 self.mlp = DenseMLP(dim: config.dim, hiddenDim: config.ffDim)

@@ -199,7 +199,7 @@ final class MoondreamService: ObservableObject {
             }
             fileLog("Pixels shape: \(pixels.shape)")
 
-            // Support both standard and quantized model types
+            // Support standard and quantized model types
             fileLog("Starting model.query()...")
             let result: String
             if let model = context.model as? Moondream3 {
@@ -282,7 +282,7 @@ final class MoondreamService: ObservableObject {
             case .long: lengthStr = "long"
             }
 
-            // Support both standard and quantized model types
+            // Support standard and quantized model types
             fileLog("Starting model.caption() with length: \(lengthStr)")
             let result: String
             if let model = context.model as? Moondream3 {
@@ -356,7 +356,7 @@ final class MoondreamService: ObservableObject {
             }
             fileLog("Pixels shape: \(pixels.shape)")
 
-            // Support both standard and quantized model types
+            // Support standard and quantized model types
             fileLog("Starting model.point()...")
             let result: String
             if let model = context.model as? Moondream3 {
@@ -431,7 +431,7 @@ final class MoondreamService: ObservableObject {
             }
             fileLog("Pixels shape: \(pixels.shape)")
 
-            // Support both standard and quantized model types
+            // Support standard and quantized model types
             fileLog("Starting model.detect()...")
             let result: String
             if let model = context.model as? Moondream3 {
