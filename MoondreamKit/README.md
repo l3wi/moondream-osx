@@ -192,6 +192,22 @@ xcodebuild -scheme YourApp -configuration Debug build
 - [mlx-swift-examples](https://github.com/ml-explore/mlx-swift-examples) (2.21.0+)
 - [swift-transformers](https://github.com/huggingface/swift-transformers) (1.0.0+)
 
+## Testing
+
+MoondreamKit includes 124 unit and integration tests covering model types, coordinate conversions, cache utilities, and model loading.
+
+```bash
+# Run all tests
+cd MoondreamKit
+xcodebuild test -scheme MoondreamKit -destination 'platform=macOS'
+
+# Run only fast unit tests (no model download required)
+xcodebuild test -scheme MoondreamKit -destination 'platform=macOS' \
+  -skip-testing:MoondreamKitTests/InferenceIntegrationTests
+```
+
+**Note**: Tests must be run with `xcodebuild`, not `swift test`, due to Metal shader requirements.
+
 ## License
 
 See LICENSE file for details.
