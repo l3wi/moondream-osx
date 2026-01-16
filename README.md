@@ -31,16 +31,17 @@ Unified Swift app with both macOS and iOS targets, built on MoondreamKit.
 
 ### macOS Features
 
-- **Liquid Glass UI** - Modern semi-transparent design with hidden title bar
+- **Modern UI** - Semi-transparent design with hidden title bar
 - **Drag & Drop** - Drop images directly onto the app
+- **Webcam Capture** - Use built-in camera for live image capture
 - **4 Skills** - Caption, Query, Point, Detect
 - **Real-time Processing** - Progress indicators and streaming results
 - **CLI Mode** - Command-line interface for scripting
 
 ### iOS Features
 
-- **iOS 26 Liquid Glass** - Native `glassEffect` and `GlassEffectContainer` APIs
-- **Camera-First UI** - Live camera preview with capture
+- **Modern UI** - Native iOS 26 design with translucent effects
+- **Camera-First** - Live camera preview with capture
 - **Model Selection** - Download and switch between Standard/Compact models
 - **Download Progress** - Visual progress with cancel support
 - **Results Overlay** - Display bounding boxes and point markers

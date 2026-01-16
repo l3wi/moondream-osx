@@ -155,7 +155,33 @@ The macOS app supports both GUI mode (no args) and CLI mode (with args):
 
 ---
 
-## iOS 26 Liquid Glass
+## Liquid Glass UI
+
+### macOS Approach
+
+macOS uses SwiftUI's built-in material system for the glass effect:
+
+```swift
+// Background material for panels
+.background(.ultraThinMaterial)
+
+// Toolbar and sidebar backgrounds
+VStack { ... }
+    .background(.ultraThinMaterial)
+
+// Hidden title bar for clean look
+.windowStyle(.hiddenTitleBar)
+```
+
+**Files Using Materials:**
+| File | Usage |
+|------|-------|
+| `ContentView.swift` | Main window with hidden title bar |
+| `ToolbarPanel.swift` | Right sidebar with `.ultraThinMaterial` |
+| `ImagePanel.swift` | Image display area |
+| `WebcamCaptureView.swift` | Full-screen camera preview |
+
+### iOS 26 Approach
 
 The iOS app uses native iOS 26 Liquid Glass APIs:
 
@@ -173,8 +199,7 @@ GlassEffectContainer {
 }
 ```
 
-### Files Using Glass Effects
-
+**Files Using Glass Effects:**
 | File | Usage |
 |------|-------|
 | `CameraView.swift` | Bottom controls in `GlassEffectContainer`, SkillIndicator, ProcessingOverlay |
