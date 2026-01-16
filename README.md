@@ -26,72 +26,6 @@ Vision-language model implementations using Apple's MLX framework for on-device 
 - **Point**: Locate objects by coordinates
 - **Detect**: Find objects with bounding boxes
 
-## Moondream App
-
-Unified Swift app with both macOS and iOS targets, built on MoondreamKit.
-
-### macOS Features
-
-- **Modern UI** - Semi-transparent design with hidden title bar
-- **Drag & Drop** - Drop images directly onto the app
-- **Webcam Capture** - Use built-in camera for live image capture
-- **4 Skills** - Caption, Query, Point, Detect
-- **Real-time Processing** - Progress indicators and streaming results
-- **CLI Mode** - Command-line interface for scripting
-
-### iOS Features
-
-- **Modern UI** - Native iOS 26 design with translucent effects
-- **Camera-First** - Live camera preview with capture
-- **Model Selection** - Download and switch between Standard/Compact models
-- **Download Progress** - Visual progress with cancel support
-- **Results Overlay** - Display bounding boxes and point markers
-
-### Requirements
-
-- macOS 15+ / iOS 26+
-- Apple Silicon (M1/M2/M3/M4) for Mac
-- iPhone 15 Pro or newer for iOS (8GB+ RAM recommended)
-- Xcode 17+
-
-### Build & Run
-
-```bash
-# Open in Xcode (recommended)
-open Moondream/Moondream.xcworkspace
-
-# Or build from command line
-cd Moondream
-
-# Build macOS
-xcodebuild -scheme Moondream-macOS -configuration Debug build
-
-# Build iOS
-xcodebuild -scheme Moondream-iOS -destination 'generic/platform=iOS Simulator' build
-```
-
-**Note:** `swift run` does not work due to Metal shader bundling issues. Must use Xcode build.
-
-### CLI Mode (macOS)
-
-```bash
-# Caption
-./Moondream image.png caption:normal
-
-# Query
-./Moondream image.png query "What is in this image?"
-
-# Point (locate object)
-./Moondream image.png point "the red button"
-
-# Detect (bounding boxes)
-./Moondream image.png detect "people"
-
-# Use a specific model (HuggingFace ID or local path)
-./Moondream image.png caption:short --model lewi/md3p-int4-smol
-./Moondream image.png query "Describe this" --model /path/to/local/model
-```
-
 ## Integrating MoondreamKit
 
 MoondreamKit is a standalone Swift package you can integrate into your own apps. The package follows a modular architecture with 20 consolidated files organized by component (Core, Vision, Language, Region, Inference, Model).
@@ -184,57 +118,112 @@ Moondream3Loader.compactConfiguration  // "lewi/md3p-int4-smol"
 
 See [MoondreamKit/README.md](MoondreamKit/README.md) for detailed API documentation.
 
+## Moondream App
+
+Unified Swift app with both macOS and iOS targets, built on MoondreamKit.
+
+### macOS Features
+
+- **Modern UI** - Semi-transparent design with hidden title bar
+- **Drag & Drop** - Drop images directly onto the app
+- **Webcam Capture** - Use built-in camera for live image capture
+- **4 Skills** - Caption, Query, Point, Detect
+- **Real-time Processing** - Progress indicators and streaming results
+- **CLI Mode** - Command-line interface for scripting
+
+### iOS Features
+
+- **Modern UI** - Native iOS 26 design with translucent effects
+- **Camera-First** - Live camera preview with capture
+- **Model Selection** - Download and switch between Standard/Compact models
+- **Download Progress** - Visual progress with cancel support
+- **Results Overlay** - Display bounding boxes and point markers
+
+### Requirements
+
+- macOS 15+ / iOS 26+
+- Apple Silicon (M1/M2/M3/M4) for Mac
+- iPhone 15 Pro or newer for iOS (8GB+ RAM recommended)
+- Xcode 17+
+
+### Build & Run
+
+```bash
+# Open in Xcode (recommended)
+open Moondream/Moondream.xcworkspace
+
+# Or build from command line
+cd Moondream
+
+# Build macOS
+xcodebuild -scheme Moondream-macOS -configuration Debug build
+
+# Build iOS
+xcodebuild -scheme Moondream-iOS -destination 'generic/platform=iOS Simulator' build
+```
+
+**Note:** `swift run` does not work due to Metal shader bundling issues. Must use Xcode build.
+
+### CLI Mode (macOS)
+
+```bash
+# Caption
+./Moondream image.png caption:normal
+
+# Query
+./Moondream image.png query "What is in this image?"
+
+# Point (locate object)
+./Moondream image.png point "the red button"
+
+# Detect (bounding boxes)
+./Moondream image.png detect "people"
+
+# Use a specific model (HuggingFace ID or local path)
+./Moondream image.png caption:short --model lewi/md3p-int4-smol
+./Moondream image.png query "Describe this" --model /path/to/local/model
+```
+
 ## Architecture
 
 ```
 moondream-mlx/
-├── MoondreamKit/                    # Swift Package (reusable, 38 files)
+├── MoondreamKit/                    # Swift Package (20 files)
 │   ├── Package.swift
 │   └── Sources/MoondreamKit/
-│       ├── Configuration/           # Model & processor configs
-│       │   ├── Moondream3Configuration.swift
-│       │   └── PlatformConfiguration.swift
-│       ├── Constants/
-│       │   └── TokenConstants.swift # Centralized token IDs
-│       ├── Generation/
-│       │   └── GenerationHelpers.swift # Shared sampling & coordinate gen
-│       ├── Layers/
-│       │   ├── RotaryEmbedding.swift # RoPE implementation
-│       │   └── KVCacheManager.swift  # KV cache allocation
-│       ├── Vision/                  # Vision encoder components
-│       │   ├── VisionEncoder.swift
-│       │   └── Quantized/           # Quantized variants
-│       ├── Language/                # Language model components
-│       │   ├── TextModel.swift
-│       │   ├── MoEMLP.swift         # Mixture of Experts
-│       │   └── Quantized/           # Quantized variants
-│       ├── Region/                  # Coordinate/detection model
-│       │   ├── RegionModel.swift
-│       │   └── FourierFeatures.swift
-│       ├── Model/
-│       │   ├── Moondream3.swift     # Standard model (~300 lines)
-│       │   └── Moondream3Quantized.swift # Compact model (~280 lines)
-│       ├── Protocols/
-│       │   └── MoondreamModelProtocol.swift # Shared interface
-│       ├── Loader/
-│       │   └── Moondream3Loader.swift
-│       ├── Cache/
+│       ├── Cache/                   # Model cache utilities
 │       │   └── ModelCache.swift
-│       ├── Processor/
-│       │   └── Moondream3Processor.swift
-│       ├── Models/                  # Data types
-│       │   ├── ModelInfo.swift
-│       │   ├── Skill.swift
-│       │   └── CoordinateTypes.swift
-│       └── Utilities/
-│           └── Logger.swift
+│       ├── Core/                    # Types, config, protocol, logging
+│       │   ├── Configuration.swift
+│       │   ├── Logger.swift
+│       │   ├── MoondreamProtocol.swift
+│       │   └── Types.swift
+│       ├── Inference/               # Runtime components
+│       │   ├── GenerationHelpers.swift
+│       │   ├── KVCacheManager.swift
+│       │   ├── Processor.swift
+│       │   └── RotaryEmbedding.swift
+│       ├── Language/                # Text model with MoE
+│       │   ├── LanguageAttention.swift
+│       │   ├── LanguageBlock.swift
+│       │   ├── MoEMLP.swift
+│       │   └── TextModel.swift
+│       ├── Model/                   # Main model classes + loader
+│       │   ├── Moondream3.swift
+│       │   ├── Moondream3Loader.swift
+│       │   └── Moondream3Quantized.swift
+│       ├── Region/                  # Coordinate/detection model
+│       │   └── RegionModel.swift
+│       └── Vision/                  # Vision encoder
+│           ├── VisionAttention.swift
+│           ├── VisionBlock.swift
+│           └── VisionEncoder.swift
 ├── Moondream/                       # Unified Swift app (macOS + iOS)
 │   ├── Moondream.xcworkspace
-│   ├── Sources/
-│   │   ├── Shared/                  # Cross-platform code
-│   │   │   └── Services/MoondreamService.swift
-│   │   ├── macOS/                   # Mac-specific UI
-│   │   └── iOS/                     # iOS-specific UI
+│   └── Sources/
+│       ├── Shared/                  # Cross-platform code
+│       ├── macOS/                   # Mac-specific UI
+│       └── iOS/                     # iOS-specific UI
 └── docs/tasks/                      # Task documentation
 ```
 
