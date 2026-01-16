@@ -15,9 +15,9 @@ Vision-language model implementations using Apple's MLX framework for on-device 
 
 | Model | ID | Size | Notes |
 |-------|-----|------|-------|
-| Int8 | Local path | 10.2 GB | Int8 quantized |
-| Standard | `moondream/md3p-int4` | 6.48 GB | MoE int4, Vision BF16 |
-| Compact | `lewi/md3p-int4-smol` | 5.43 GB | Full int4, iOS optimized |
+| Int8 | [`lewi/md3p-int8`](https://huggingface.co/lewi/md3p-int8) | 10.2 GB | Int8 quantized |
+| Standard | [`moondream/md3p-int4`](https://huggingface.co/moondream/md3p-int4) | 6.48 GB | MoE int4, Vision BF16 |
+| Compact | [`lewi/md3p-int4-smol`](https://huggingface.co/lewi/md3p-int4-smol) | 5.43 GB | Full int4, iOS optimized |
 
 ## Features
 
