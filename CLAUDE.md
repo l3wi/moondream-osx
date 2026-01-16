@@ -246,6 +246,207 @@ The vision encoder's `patchEmb` layer had dimension 588 (14×14×3) which isn't 
 
 ---
 
+## Agent Development Guide
+
+### Code Style & Conventions
+
+**Naming:**
+| Category | Convention | Examples |
+|----------|------------|----------|
+| Files | PascalCase | `CameraService.swift`, `MoondreamService.swift` |
+| Types/Classes | PascalCase | `Skill`, `NormalizedPoint`, `MoondreamResult` |
+| Functions/Methods | camelCase | `captureCurrentFrame()`, `loadModel()` |
+| Variables/Properties | camelCase | `selectedSkill`, `isFrozen`, `isProcessing` |
+| Enum cases | lowercase | `.caption`, `.query`, `.point`, `.detect` |
+
+**File Organization:**
+```swift
+// Use MARK sections to organize code
+// MARK: - Properties
+// MARK: - Initialization
+// MARK: - Public Methods
+// MARK: - Private Methods
+// MARK: - View Body (for SwiftUI views)
+```
+
+**Error Handling:**
+```swift
+// Custom errors implement LocalizedError + Identifiable
+enum MoondreamError: LocalizedError {
+    case modelNotLoaded
+    case imageConversionFailed
+    case inferenceError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .modelNotLoaded: "Model not loaded"
+        // ...
+        }
+    }
+}
+```
+
+**Async/Await:**
+```swift
+// Use @MainActor for UI-related classes
+@MainActor
+final class MoondreamService: ObservableObject { ... }
+
+// Use Task { @MainActor in } for callbacks
+AVCaptureDevice.requestAccess(for: .video) { granted in
+    Task { @MainActor in
+        self?.handlePermission(granted)
+    }
+}
+```
+
+---
+
+### SwiftUI Patterns
+
+**iOS (Modern @Observable):**
+```swift
+@MainActor
+@Observable
+final class AppState {
+    var selectedSkill: Skill = .caption
+    var isProcessing: Bool = false
+}
+
+// In views:
+@Environment(AppState.self) private var appState
+```
+
+**macOS (Traditional ObservableObject):**
+```swift
+@MainActor
+final class MoondreamService: ObservableObject {
+    @Published var isLoaded = false
+    static let shared = MoondreamService()
+}
+
+// In views:
+@EnvironmentObject var service: MoondreamService
+@StateObject private var cameraService = MacCameraService()
+```
+
+**Bindings for Component Props:**
+```swift
+// Parent creates binding
+SkillTabBar(selection: $selectedSkill)
+
+// Or manual binding
+SkillSelectorButton(selectedSkill: Binding(
+    get: { appState.selectedSkill },
+    set: { appState.selectedSkill = $0 }
+))
+```
+
+**Platform-Specific Code:**
+```swift
+#if os(iOS)
+private let maxTokens = 128  // Conservative for iOS memory
+#else
+private let maxTokens = 768
+#endif
+```
+
+---
+
+### Testing
+
+**Framework:** XCTest
+
+**Test Location:** `Moondream/Tests/MoondreamMacTests/`
+
+**Running Tests:**
+- **Xcode:** Select test target → Cmd+U
+- **CLI:** `xcodebuild test -scheme Moondream-macOS` (Metal required)
+- **Note:** `swift test` won't work due to Metal shader requirements
+
+**Test Files:**
+- `ConfigurationTests.swift` - Model constants validation
+- `IntegrationTests.swift` - End-to-end with real images
+- `RoPETests.swift` - Rotary position embedding tests
+- `KVCacheTests.swift` - KV cache shape tests
+
+**Test Pattern:**
+```swift
+import XCTest
+@testable import MoondreamMac
+
+final class MyTests: XCTestCase {
+    func testExample() throws {
+        // Arrange
+        let input = ...
+        // Act
+        let result = ...
+        // Assert
+        XCTAssertEqual(result, expected)
+    }
+}
+```
+
+---
+
+### Development Workflow
+
+**Critical: Always Use Xcode Build**
+```bash
+# CORRECT - use xcodebuild
+xcodebuild -scheme Moondream-macOS -configuration Debug build
+
+# WRONG - swift build doesn't bundle Metal shaders
+swift build  # Will fail at runtime!
+```
+
+**Project Structure:**
+- `Moondream.xcworkspace` - Open this (includes MoondreamKit)
+- `Moondream.xcodeproj` - The app project
+- Schemes: `Moondream-macOS`, `Moondream-iOS`
+
+**Adding Files to Xcode:**
+When creating new Swift files, they must be added to `project.pbxproj`:
+1. Add `PBXFileReference` entry
+2. Add `PBXBuildFile` entry for target
+3. Add to appropriate `PBXGroup`
+4. Add to `PBXSourcesBuildPhase`
+
+Or just add files via Xcode UI (File → New File).
+
+---
+
+### Common Tasks
+
+**Adding a New macOS View:**
+1. Create `Sources/macOS/Views/MyView.swift`
+2. Add to Xcode project (macOS target)
+3. Follow existing view patterns (GeometryReader, ZStack, etc.)
+
+**Adding a New iOS View:**
+1. Create `Sources/iOS/Views/MyView.swift`
+2. Add to Xcode project (iOS target)
+3. Use `@Environment(AppState.self)` for state
+4. Use `.glassEffect()` for iOS 26 Liquid Glass
+
+**Adding a Shared Component:**
+1. Create `Sources/Shared/Components/MyComponent.swift`
+2. Add to both macOS and iOS targets in Xcode
+3. Use `#if os()` for platform differences
+
+**Modifying Model Inference:**
+1. Core model: `MoondreamKit/Sources/MoondreamKit/Moondream3.swift`
+2. Service layer: `Moondream/Sources/Shared/Services/MoondreamService.swift`
+3. Test changes with `images/monalisa-on-a-gallery-wall.png`
+
+**Adding a New Skill:**
+1. Add case to `Skill` enum in `MoondreamKit/Sources/MoondreamKit/Models/Skill.swift`
+2. Add method to `Moondream3.swift`
+3. Add service method to `MoondreamService.swift`
+4. Add UI for skill in both macOS and iOS views
+
+---
+
 ## TODO
 
 - [x] Fix Swift garbage token output
@@ -256,5 +457,6 @@ The vision encoder's `patchEmb` layer had dimension 588 (14×14×3) which isn't 
 - [x] Add model download/selection screen to iOS
 - [x] Implement iOS 26 Liquid Glass APIs
 - [x] Fix patchEmb quantization shape error
+- [x] Add webcam capture to macOS app
 - [ ] Fix gatherSort shape issue for MoE
 - [ ] Performance profiling
