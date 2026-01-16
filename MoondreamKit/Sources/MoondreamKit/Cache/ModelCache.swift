@@ -1,6 +1,3 @@
-// Copyright 2025 Anthropic. All rights reserved.
-// SPDX-License-Identifier: MIT
-
 import Foundation
 import Hub
 

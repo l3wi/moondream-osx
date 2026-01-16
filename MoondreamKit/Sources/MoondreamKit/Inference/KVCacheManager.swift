@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// KV Cache management utilities
-
 import Foundation
 import MLX
 

@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Public types for MoondreamKit
-
 import Foundation
 import CoreGraphics
 

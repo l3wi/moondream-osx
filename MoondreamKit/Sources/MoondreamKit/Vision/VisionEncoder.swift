@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Vision Encoder for Moondream3 (standard and quantized variants)
-
 import Foundation
 import MLX
 import MLXNN

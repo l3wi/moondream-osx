@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Language model transformer blocks (standard and quantized variants)
-
 import Foundation
 import MLX
 import MLXNN

@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Moondream3 Vision-Language Model (Standard variant)
-
 import Foundation
 import MLX
 import MLXLMCommon

@@ -1,6 +1,3 @@
-// Copyright © 2024 Moondream AI
-// Loader for Moondream3 model
-
 import Foundation
 import Hub
 import MLX

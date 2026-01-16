@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Mixture of Experts MLP
-
 import Foundation
 import MLX
 import MLXNN

@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Image processor for Moondream3
-
 import CoreGraphics
 import CoreImage
 import Foundation

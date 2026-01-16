@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Vision Attention layers (standard and quantized variants)
-
 import Foundation
 import MLX
 import MLXFast

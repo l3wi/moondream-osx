@@ -1,6 +1,3 @@
-// Copyright 2025 Moondream AI. All rights reserved.
-// SPDX-License-Identifier: MIT
-
 import XCTest
 import CoreGraphics
 @testable import MoondreamKit

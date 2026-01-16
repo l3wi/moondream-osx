@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Rotary Position Embedding (RoPE) implementation
-
 import Foundation
 import MLX
 

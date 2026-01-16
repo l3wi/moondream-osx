@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Model and platform configuration for MoondreamKit
-
 import Foundation
 
 // MARK: - Model Configuration

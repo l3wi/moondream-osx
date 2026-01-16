@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Region model for coordinate/size encoding/decoding (standard and quantized variants)
-
 import Foundation
 import MLX
 import MLXNN

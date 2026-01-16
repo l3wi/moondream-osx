@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Language model attention with Tau modulation (standard and quantized variants)
-
 import Foundation
 import MLX
 import MLXFast

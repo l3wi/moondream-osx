@@ -1,6 +1,3 @@
-// Copyright 2024 Moondream AI
-// Logging utilities for MoondreamKit
-
 import Foundation
 import os.log
 
