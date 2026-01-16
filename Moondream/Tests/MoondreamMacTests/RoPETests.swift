@@ -3,7 +3,7 @@
 
 import XCTest
 import MLX
-@testable import MoondreamCore
+@testable import MoondreamKit
 
 final class RoPETests: XCTestCase {
 

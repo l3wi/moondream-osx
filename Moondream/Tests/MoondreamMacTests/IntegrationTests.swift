@@ -10,7 +10,7 @@ import Tokenizers
 import MLXVLM
 import MLXLMCommon
 import CoreImage
-@testable import MoondreamCore
+@testable import MoondreamKit
 
 /// Integration tests that verify the full pipeline works correctly
 /// These tests require the model to be downloaded and take longer to run

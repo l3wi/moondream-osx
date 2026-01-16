@@ -2,6 +2,28 @@
 
 A Swift package for running the Moondream3 vision-language model on Apple Silicon using MLX.
 
+## Package Structure
+
+MoondreamKit follows a modular architecture with 38 focused files:
+
+```
+Sources/MoondreamKit/
+├── Configuration/      # Model & processor configurations
+├── Constants/          # Token IDs and prompt templates
+├── Generation/         # Shared sampling & coordinate generation
+├── Layers/             # RoPE, KV cache management
+├── Vision/             # Vision encoder (standard + quantized)
+├── Language/           # Text model with MoE (standard + quantized)
+├── Region/             # Coordinate/detection model
+├── Model/              # Main model classes
+├── Protocols/          # MoondreamModel protocol
+├── Loader/             # HuggingFace model loading
+├── Cache/              # Local cache management
+├── Processor/          # Image preprocessing
+├── Models/             # Data types (Skill, ModelInfo, etc.)
+└── Utilities/          # Logging
+```
+
 ## Requirements
 
 - macOS 15.0+ / iOS 18.0+
@@ -132,9 +154,13 @@ struct NormalizedBox: Identifiable, Equatable, Sendable {
 
 ## Model Details
 
-- **Model**: Moondream3 (int4 quantized)
-- **Size**: ~2GB
-- **Source**: `moondream/md3p-int4` on HuggingFace
+| Model | ID | Size | Notes |
+|-------|-----|------|-------|
+| Int8 | Local path | 10.2 GB | Int8 quantized |
+| Standard | `moondream/md3p-int4` | 6.48 GB | MoE int4, Vision BF16 |
+| Compact | `lewi/md3p-int4-smol` | 5.43 GB | Full int4, iOS optimized |
+
+You can also load local models by passing a file path instead of a HuggingFace ID.
 
 The model weights are automatically downloaded on first use and cached locally.
 

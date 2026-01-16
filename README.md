@@ -15,6 +15,7 @@ Vision-language model implementations using Apple's MLX framework for on-device 
 
 | Model | ID | Size | Notes |
 |-------|-----|------|-------|
+| Int8 | Local path | 10.2 GB | Int8 quantized |
 | Standard | `moondream/md3p-int4` | 6.48 GB | MoE int4, Vision BF16 |
 | Compact | `lewi/md3p-int4-smol` | 5.43 GB | Full int4, iOS optimized |
 
@@ -85,11 +86,15 @@ xcodebuild -scheme Moondream-iOS -destination 'generic/platform=iOS Simulator' b
 
 # Detect (bounding boxes)
 ./Moondream image.png detect "people"
+
+# Use a specific model (HuggingFace ID or local path)
+./Moondream image.png caption:short --model lewi/md3p-int4-smol
+./Moondream image.png query "Describe this" --model /path/to/local/model
 ```
 
 ## Integrating MoondreamKit
 
-MoondreamKit is a standalone Swift package you can integrate into your own apps.
+MoondreamKit is a standalone Swift package you can integrate into your own apps. The package follows a modular architecture with 38 focused files organized by component (Vision, Language, Region, Generation).
 
 ### Installation
 
@@ -183,18 +188,46 @@ See [MoondreamKit/README.md](MoondreamKit/README.md) for detailed API documentat
 
 ```
 moondream-mlx/
-├── MoondreamKit/                    # Swift Package (reusable)
+├── MoondreamKit/                    # Swift Package (reusable, 38 files)
 │   ├── Package.swift
-│   ├── Sources/MoondreamKit/
-│   │   ├── Moondream3.swift         # Standard model
-│   │   ├── Moondream3Quantized.swift # Compact model (in same file)
-│   │   ├── Moondream3Loader.swift   # Model loading from HuggingFace
-│   │   ├── ModelCache.swift         # Cache detection/deletion
-│   │   └── Models/
-│   │       ├── ModelInfo.swift      # Model metadata
-│   │       ├── Skill.swift          # caption/query/point/detect
-│   │       └── ...
-│   └── Tests/
+│   └── Sources/MoondreamKit/
+│       ├── Configuration/           # Model & processor configs
+│       │   ├── Moondream3Configuration.swift
+│       │   └── PlatformConfiguration.swift
+│       ├── Constants/
+│       │   └── TokenConstants.swift # Centralized token IDs
+│       ├── Generation/
+│       │   └── GenerationHelpers.swift # Shared sampling & coordinate gen
+│       ├── Layers/
+│       │   ├── RotaryEmbedding.swift # RoPE implementation
+│       │   └── KVCacheManager.swift  # KV cache allocation
+│       ├── Vision/                  # Vision encoder components
+│       │   ├── VisionEncoder.swift
+│       │   └── Quantized/           # Quantized variants
+│       ├── Language/                # Language model components
+│       │   ├── TextModel.swift
+│       │   ├── MoEMLP.swift         # Mixture of Experts
+│       │   └── Quantized/           # Quantized variants
+│       ├── Region/                  # Coordinate/detection model
+│       │   ├── RegionModel.swift
+│       │   └── FourierFeatures.swift
+│       ├── Model/
+│       │   ├── Moondream3.swift     # Standard model (~300 lines)
+│       │   └── Moondream3Quantized.swift # Compact model (~280 lines)
+│       ├── Protocols/
+│       │   └── MoondreamModelProtocol.swift # Shared interface
+│       ├── Loader/
+│       │   └── Moondream3Loader.swift
+│       ├── Cache/
+│       │   └── ModelCache.swift
+│       ├── Processor/
+│       │   └── Moondream3Processor.swift
+│       ├── Models/                  # Data types
+│       │   ├── ModelInfo.swift
+│       │   ├── Skill.swift
+│       │   └── CoordinateTypes.swift
+│       └── Utilities/
+│           └── Logger.swift
 ├── Moondream/                       # Unified Swift app (macOS + iOS)
 │   ├── Moondream.xcworkspace
 │   ├── Sources/
@@ -202,11 +235,6 @@ moondream-mlx/
 │   │   │   └── Services/MoondreamService.swift
 │   │   ├── macOS/                   # Mac-specific UI
 │   │   └── iOS/                     # iOS-specific UI
-│   │       ├── Views/
-│   │       │   ├── CameraView.swift
-│   │       │   ├── ModelDownloadView.swift
-│   │       │   └── ...
-│   │       └── Components/
 └── docs/tasks/                      # Task documentation
 ```
 
