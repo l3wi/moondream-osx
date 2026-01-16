@@ -46,7 +46,7 @@ struct ModelDownloadView: View {
                 // Model list with Liquid Glass container
                 GlassEffectContainer {
                     VStack(spacing: 12) {
-                        ForEach(AvailableModels.all) { model in
+                        ForEach(AvailableModels.iOSCompatible) { model in
                             ModelDownloadRow(
                                 model: model,
                                 onDownloadComplete: {

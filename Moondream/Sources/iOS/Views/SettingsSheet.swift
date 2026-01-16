@@ -25,13 +25,13 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var moondreamService = MoondreamService.shared
 
-    // Computed model lists
+    // Computed model lists (filtered to iOS-compatible models)
     private var downloadedModels: [ModelInfo] {
-        AvailableModels.all.filter { appState.downloadedModelIds.contains($0.id) }
+        AvailableModels.iOSCompatible.filter { appState.downloadedModelIds.contains($0.id) }
     }
 
     private var availableForDownload: [ModelInfo] {
-        AvailableModels.all.filter { !appState.downloadedModelIds.contains($0.id) }
+        AvailableModels.iOSCompatible.filter { !appState.downloadedModelIds.contains($0.id) }
     }
 
     var body: some View {

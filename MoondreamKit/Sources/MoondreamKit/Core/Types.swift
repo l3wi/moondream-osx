@@ -296,6 +296,13 @@ public enum AvailableModels {
     /// All available models
     public static let all: [ModelInfo] = [
         ModelInfo(
+            id: "lewi/md3p-int8",
+            displayName: "Moondream 3 Int8",
+            description: "Highest quality, requires 16GB+ RAM (macOS only)",
+            quantization: "Int8",
+            sizeBytes: 10_960_000_000  // ~10.2 GB
+        ),
+        ModelInfo(
             id: "moondream/md3p-int4",
             displayName: "Moondream 3 Standard",
             description: "Best quality, recommended for devices with 8GB+ RAM",
@@ -310,6 +317,11 @@ public enum AvailableModels {
             sizeBytes: 5_830_000_000  // ~5.43 GB
         )
     ]
+
+    /// Models compatible with iOS (filtered by size)
+    public static var iOSCompatible: [ModelInfo] {
+        all.filter { $0.isCompatibleWithiOS }
+    }
 
     /// Default model ID for each platform
     public static var defaultId: String {
