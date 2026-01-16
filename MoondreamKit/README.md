@@ -4,24 +4,37 @@ A Swift package for running the Moondream3 vision-language model on Apple Silico
 
 ## Package Structure
 
-MoondreamKit follows a modular architecture with 38 focused files:
+MoondreamKit follows a modular architecture with 20 consolidated files:
 
 ```
 Sources/MoondreamKit/
-├── Configuration/      # Model & processor configurations
-├── Constants/          # Token IDs and prompt templates
-├── Generation/         # Shared sampling & coordinate generation
-├── Layers/             # RoPE, KV cache management
-├── Vision/             # Vision encoder (standard + quantized)
+├── Cache/              # Model cache utilities
+│   └── ModelCache.swift
+├── Core/               # Types, configuration, protocol, logging
+│   ├── Configuration.swift
+│   ├── Logger.swift
+│   ├── MoondreamProtocol.swift
+│   └── Types.swift
+├── Inference/          # Runtime components
+│   ├── GenerationHelpers.swift
+│   ├── KVCacheManager.swift
+│   ├── Processor.swift
+│   └── RotaryEmbedding.swift
 ├── Language/           # Text model with MoE (standard + quantized)
+│   ├── LanguageAttention.swift
+│   ├── LanguageBlock.swift
+│   ├── MoEMLP.swift
+│   └── TextModel.swift
+├── Model/              # Main model classes + loader
+│   ├── Moondream3.swift
+│   ├── Moondream3Loader.swift
+│   └── Moondream3Quantized.swift
 ├── Region/             # Coordinate/detection model
-├── Model/              # Main model classes
-├── Protocols/          # MoondreamModel protocol
-├── Loader/             # HuggingFace model loading
-├── Cache/              # Local cache management
-├── Processor/          # Image preprocessing
-├── Models/             # Data types (Skill, ModelInfo, etc.)
-└── Utilities/          # Logging
+│   └── RegionModel.swift
+└── Vision/             # Vision encoder (standard + quantized)
+    ├── VisionAttention.swift
+    ├── VisionBlock.swift
+    └── VisionEncoder.swift
 ```
 
 ## Requirements
